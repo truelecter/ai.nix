@@ -13,9 +13,9 @@
     "test": "bun test client/*.test.ts"
   },
   "devDependencies": {
-    "@getpaseo/client": "0.16.0",
-    "@getpaseo/plugin": "0.16.0",
-    "@getpaseo/protocol": "0.16.0",
+    "@getpaseo/client": "0.17.0",
+    "@getpaseo/plugin": "0.17.0",
+    "@getpaseo/protocol": "0.17.0",
     "@types/node": "^22.10.0",
     "@types/react": "~19.2.0",
     "react-native": "0.86.3",

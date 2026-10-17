@@ -151,7 +151,7 @@ in {
       default = {};
       example = literalExpression ''
         {
-          wide-chat = { };
+          header-tab-name = { };
           vpn.enabled = false;
         }
       '';

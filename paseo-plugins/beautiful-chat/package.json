@@ -15,9 +15,9 @@
     "@shikijs/themes": "^4.0.2"
   },
   "devDependencies": {
-    "@getpaseo/client": "0.16.0",
-    "@getpaseo/plugin": "0.16.0",
-    "@getpaseo/protocol": "0.16.0",
+    "@getpaseo/client": "0.17.0",
+    "@getpaseo/plugin": "0.17.0",
+    "@getpaseo/protocol": "0.17.0",
     "@types/node": "^22.15.3",
     "@types/react": "~19.2.0",
     "react": "19.2.3",

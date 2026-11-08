@@ -133,7 +133,7 @@
       then null
       else if nodeModulesHashes ? ${name}
       then nodeModules name {production = true;}
-      else throw "paseo plugin ${name}: has dependencies, add it to nodeModulesHashes in parts/ai/paseo-plugins/default.nix";
+      else throw "paseo plugin ${name}: has dependencies, add it to nodeModulesHashes in paseo-plugins/default.nix";
     # The test script is `bun test <globs>`; run the same files.
     testArgs = lib.removePrefix "bun test" (package.scripts.test or "bun test");
   in
@@ -146,7 +146,7 @@
           inherit src;
 
           dontConfigure = true;
-          # Bundles plus tests: not worth shipping to a remote builder. On the tl-mm4 builder the
+          # Bundles plus tests: not worth shipping to a remote builder. On a remote macOS builder the
           # vpn script tests also fail (the challenge never reaches the test socket); locally they pass.
           preferLocalBuild = true;
 

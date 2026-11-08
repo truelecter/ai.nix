@@ -35,7 +35,7 @@ default theme.
 
 ## Develop
 
-Installed through `programs.paseo.plugins.catppuccin-mocha` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link catppuccin-mocha` from your checkout: Paseo then loads this folder, `paseo plugin reload catppuccin-mocha` picks up each edit, and `paseo plugin logs catppuccin-mocha` shows its output. `paseo-plugin-dev restore catppuccin-mocha` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.catppuccin-mocha` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link catppuccin-mocha` from your checkout: Paseo then loads this folder, `paseo plugin reload catppuccin-mocha` picks up each edit, and `paseo plugin logs catppuccin-mocha` shows its output. `paseo-plugin-dev restore catppuccin-mocha` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

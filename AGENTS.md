@@ -1,36 +1,33 @@
-# AGENTS.md: AI agent tooling (`parts/ai`)
+# AGENTS.md: AI agent tooling
 
-How to change and test the oh-my-pi (`omp`) Home Manager module, the OMP extensions, the GSD package, and the Paseo module and plugins in this folder. Read it before touching anything under `parts/ai/` or the OMP settings in `profiles/home/dev/ai.nix`.
+How to change and test the oh-my-pi (`omp`) Home Manager module, the OMP extensions, the GSD package, and the Paseo module and plugins in this repository. Read it before touching anything here.
 
 ## Layout
 
 ```text
-parts/ai/
-  default.nix                 flake-parts module: packages, overlays.ai, homeModules.oh-my-pi, homeModules.paseo, homeModules.searxng
-  homeModules/oh-my-pi.nix    the programs.oh-my-pi Home Manager module
-  homeModules/paseo.nix       the programs.paseo Home Manager module (~/.paseo/config.json and plugins)
-  homeModules/paseo-sync.sh   its activation step: merges config.json, applies plugin changes to a running daemon
-  homeModules/paseo-plugin-dev.sh  `paseo-plugin-dev`: points a plugin link at a checkout or back, without a switch
-  homeModules/searxng.nix     the services.searxng Home Manager module (local SearXNG user service)
-  omp-extensions/
-    default.nix               builds every <name>/ folder, plus `gsd` from packages/gsd-omp and gsd/
-    <name>/                   one OMP extension per folder
-  paseo-plugins/
-    default.nix               builds every <id>/ folder; requirements.paseo check, node_modules hashes
-    semver.nix                the range check used for requirements.paseo
-    node-modules.nix          fixed-output `bun install` used for plugin dependencies and test deps
-    _test-deps/               zod, react, and the plugin SDK, locked, for the plugins' tests
-    _e2e/                     end-to-end suite: harness, Playwright specs per plugin (paseo-plugins-e2e)
-    _e2e/node-modules.nix     the suite's locked `@getpaseo/client` and `ws`, shared with paseo-pin-workspace
-    <id>/                     one Paseo plugin per folder
-  packages/gsd-omp/           the gsd-omp CLI (buildNpmPackage), see its README for updates
-  packages/paseo-pin-workspace/  `paseo-pin-workspace`: pins or unpins a workspace in the local Paseo daemon's sidebar
-profiles/home/dev/ai.nix      the shared profile: OMP extension list and provider-neutral settings, programs.paseo settings and plugins
-profiles/home/dev/_files/omp/ rules, skills, and subagents linked into ~/.omp/agent
-home/users/<os>/<user>.nix    per-user choices: OMP model roles and models.yml, Paseo's title-generation model, machine-bound Paseo plugins (vpn)
+flake.nix                     inputs (nixpkgs, latest, flake-parts, llm-agents, paseo) and every output
+homeModules/oh-my-pi.nix      the programs.oh-my-pi Home Manager module
+homeModules/paseo.nix         the programs.paseo Home Manager module (~/.paseo/config.json and plugins)
+homeModules/paseo-sync.sh     its activation step: merges config.json, applies plugin changes to a running daemon
+homeModules/paseo-plugin-dev.sh  `paseo-plugin-dev`: points a plugin link at a checkout or back, without a switch
+homeModules/searxng.nix       the services.searxng Home Manager module (local SearXNG user service)
+omp-extensions/
+  default.nix                 builds every <name>/ folder, plus `gsd` from packages/gsd-omp and gsd/
+  <name>/                     one OMP extension per folder
+paseo-plugins/
+  default.nix                 builds every <id>/ folder; requirements.paseo check, node_modules hashes
+  semver.nix                  the range check used for requirements.paseo
+  node-modules.nix            fixed-output `bun install` used for plugin dependencies and test deps
+  _test-deps/                 zod, react, and the plugin SDK, locked, for the plugins' tests
+  _e2e/                       end-to-end suite: harness, Playwright specs per plugin (paseo-plugins-e2e)
+  _e2e/node-modules.nix       the suite's locked `@getpaseo/client` and `ws`, shared with paseo-pin-workspace
+  <id>/                       one Paseo plugin per folder
+packages/gsd-omp/             the gsd-omp CLI (buildNpmPackage), see its README for updates
+packages/paseo-pin-workspace/ `paseo-pin-workspace`: pins or unpins a workspace in the local Paseo daemon's sidebar
+.github/workflows/            the end-to-end suite in CI, the weekly flake.lock update
 ```
 
-Outputs, all from `default.nix`:
+Outputs, all from `flake.nix`:
 
 | Output                                   | What it is                                                                                                                                            |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -39,12 +36,14 @@ Outputs, all from `default.nix`:
 | `packages.<system>.paseo-plugins-e2e`    | the plugins' end-to-end suite on every system, `nix run .#paseo-plugins-e2e` (see "End-to-end tests")                                                 |
 | `packages.<system>.gsd-omp`              | the gsd-omp CLI                                                                                                                                       |
 | `packages.<system>.paseo-pin-workspace`  | `paseo-pin-workspace`, `nix run .#paseo-pin-workspace -- <workspace-id>` (see "Pin a workspace")                                                      |
-| `overlays.ai`                            | `pkgs.omp-extensions.<name>`, `pkgs.paseo-plugins.<id>`, `pkgs.gsd-omp`, and `pkgs.paseo-pin-workspace`; the darwin and NixOS configurations apply it |
-| `homeModules.oh-my-pi`                   | `programs.oh-my-pi`; also shared into every Home Manager user                                                                                         |
-| `homeModules.paseo`                      | `programs.paseo`; also shared into every Home Manager user                                                                                            |
-| `homeModules.searxng`                    | `services.searxng`; also shared into every Home Manager user                                                                                          |
+| `overlays.default`                       | `pkgs.omp-extensions.<name>`, `pkgs.paseo-plugins.<id>`, `pkgs.gsd-omp`, `pkgs.paseo-pin-workspace`, `pkgs.omp`, `pkgs.paseo`, `pkgs.paseo-desktop`, `pkgs.searxng`, `pkgs.spec-kit`, `pkgs.openspec`; the modules' package defaults read these |
+| `homeModules.oh-my-pi`                   | `programs.oh-my-pi`                                                                                                                                   |
+| `homeModules.paseo`                      | `programs.paseo`                                                                                                                                      |
+| `homeModules.searxng`                    | `services.searxng`                                                                                                                                    |
 
-Provider choices belong to the user, not the shared profile: `profiles/home/dev/ai.nix` routes agents to role names (`task.agentModelOverrides`, `@gsd-deep`, ...), and each user's file under `home/users/` maps those roles to models (`programs.oh-my-pi.settings.modelRoles`, `retry.fallbackChains`, `models`). Unset roles resolve to no model, and OMP falls back to the session model. This repository is public: keep secrets and internal endpoints (credentials, MCP servers on internal hosts) out of it. The module loads such settings from a later overlay through `extraConfigFiles` or an `OMP_CONFIG_FILES` line in `~/.omp/agent/.env`, kept outside this repository; secrets themselves go in `~/.omp/agent/.env`.
+A consumer applies `overlays.default` to its nixpkgs and imports the modules (for example through `home-manager.sharedModules`); the settings themselves (extension list, plugin list, model roles) live in the consumer's Home Manager profile. The flake's own `packages` build against its `nixpkgs` with Bun from `latest`; through the overlay they build against the consumer's nixpkgs, so the consumer's `bun` must read the current `bun.lock` format. Consumers that set `follows` for `nixpkgs` and `latest` build with their own pins, which this repository's CI doesn't test.
+
+Provider choices belong to the user, not the shared profile: a consumer's shared profile routes agents to role names (`task.agentModelOverrides`, `@gsd-deep`, ...), and each user's own file maps those roles to models (`programs.oh-my-pi.settings.modelRoles`, `retry.fallbackChains`, `models`). Unset roles resolve to no model, and OMP falls back to the session model. This repository is public: keep secrets and internal endpoints (credentials, MCP servers on internal hosts) out of it. The module loads such settings from a later overlay through `extraConfigFiles` or an `OMP_CONFIG_FILES` line in `~/.omp/agent/.env`, kept outside this repository; secrets themselves go in `~/.omp/agent/.env`.
 
 ## How OMP reads what the module writes
 
@@ -91,7 +90,7 @@ The build (`omp-extensions/default.nix`) copies only `index.ts`, `package.json`,
 
 4. Smoke-test the real behavior in an isolated OMP (next section). Tests alone are not proof; exercise the changed path.
 5. Update the extension's `README.md`, and bump `version` if behavior changed.
-6. Deploy: `darwin-rebuild switch --flake .#<host>` (or the NixOS equivalent). OMP loads extensions at session start and has no reload command, so start a new session.
+6. Deploy: push, then update this flake's input in the consuming configuration (`nix flake update <input>`) and switch it (`darwin-rebuild switch --flake .#<host>` or the NixOS equivalent). To try a change before pushing, build or switch the consumer with `--override-input <input> path:<this checkout>`. OMP loads extensions at session start and has no reload command, so start a new session.
 
 ## Smoke-test in an isolated OMP
 
@@ -109,7 +108,7 @@ Load the extension from source for one run with `-e <folder>` (repeatable). To r
 No model call, check that it loads and registers commands:
 
 ```sh
-(sleep 8) | omp --mode rpc --no-session -e ./parts/ai/omp-extensions/<name> 2>"$d/err" \
+(sleep 8) | omp --mode rpc --no-session -e ./omp-extensions/<name> 2>"$d/err" \
   | jq -r 'select(.type=="available_commands_update") | .commands[].name' | sort -u
 ```
 
@@ -136,18 +135,23 @@ Observed limits worth knowing before designing an extension:
 ## Change the module
 
 - Keep option descriptions free of `cfg` references; they are rendered without a configuration.
-- Build a throwaway Home Manager configuration that exercises the options you touched and inspect the generated files, then the real host:
+- Build a throwaway Home Manager configuration that exercises the options you touched and inspect the generated files, then the consumer's generation against this checkout:
 
   ```sh
   nix build --impure --no-link --print-out-paths --expr '
     let
       f = builtins.getFlake (toString ./.);
+      hm = builtins.getFlake "github:nix-community/home-manager/release-26.05";
+      system = "aarch64-darwin";
       pkgs = import f.inputs.nixpkgs {
-        system = "aarch64-darwin";
-        overlays = [f.overlays.latest-packages f.overlays.common-external f.overlays.ai];
+        inherit system;
+        overlays = [
+          (_: _: { inherit (import f.inputs.latest { inherit system; }) bun; })
+          f.overlays.default
+        ];
         config.allowUnfree = true;
       };
-    in (f.inputs.home.lib.homeManagerConfiguration {
+    in (hm.lib.homeManagerConfiguration {
       inherit pkgs;
       modules = [f.homeModules.oh-my-pi {
         home = { username = "t"; homeDirectory = "/tmp/hmt"; stateVersion = "26.05"; };
@@ -155,16 +159,18 @@ Observed limits worth knowing before designing an extension:
       }];
     }).activationPackage'
   # then: find -L <result>/home-files/.omp; cat <result>/home-files/.omp/.env
-  nix build '.#darwinConfigurations.<host>.config.home-manager.users."<user>".home.activationPackage' --no-link
+  # in the consumer's checkout:
+  nix build '.#darwinConfigurations.<host>.config.home-manager.users."<user>".home.activationPackage' \
+    --no-link --override-input <input> path:<this checkout>
   ```
 
 - Point an isolated OMP (above) at the generated files: link `<result>/home-files/.omp/agent/*` into `$d/agent` with `cp -RP` so symlinks stay symlinks, which is how Home Manager installs them.
-- The module builds `nix-settings-notice` from `../omp-extensions` itself, so it works without `overlays.ai`.
+- The module builds `nix-settings-notice` from `../omp-extensions` itself, so it works without `overlays.default`.
 
 ## Add or remove an extension
 
-- Add: copy a folder, rename it, fix `package.json` and `bun.lock` (`bun install`), write the code, tests, and README, `git add -N` it. `omp-extension-<name>` and `pkgs.omp-extensions.<name>` appear automatically. Enable it in `profiles/home/dev/ai.nix` (`programs.oh-my-pi.extensions`; order is load order).
-- Remove: delete the folder and its entry in the profile.
+- Add: copy a folder, rename it, fix `package.json` and `bun.lock` (`bun install`), write the code, tests, and README, `git add -N` it. `omp-extension-<name>` and `pkgs.omp-extensions.<name>` appear automatically. Enable it in the consumer's profile (`programs.oh-my-pi.extensions`; order is load order).
+- Remove: delete the folder and its entry in the consumer's profile.
 
 ## GSD
 
@@ -176,7 +182,7 @@ Observed limits worth knowing before designing an extension:
 
 ## Paseo
 
-`programs.paseo` manages the Paseo daemon's `~/.paseo/config.json` and its plugins, and installs Paseo itself: `desktop.enable` adds the app (`pkgs.paseo-desktop`) to `home.packages` and, on macOS, signs the copy in `~/Applications/Home Manager Apps` again (`signPaseo`), ad-hoc with the designated requirement `identifier "sh.paseo.desktop"` on the outer bundle so macOS keeps folder grants across updates (the default ad-hoc requirement is the cdhash, which changes every build); `cli.enable` (default on) puts `paseo` on `PATH`. `cli.package` defaults to the desktop package when the app is enabled, whose `bin/paseo` (added by `overlays.ai`) links the CLI bundled in the app, and to `pkgs.paseo` (the server package) otherwise. `profiles/home/dev/ai.nix` enables the module with the app, the daemon settings, and the shared plugin list. What belongs to one user or machine goes in that user's file, and the module deep-merges both: the model Paseo names agents with (`programs.paseo.settings.agents.metadataGeneration`, like the OMP roles), and plugins tied to the machine (`vpn`, for the work VPN in Tunnelblick). Versions refer to Paseo 0.11.0-beta.5; recheck after upgrades.
+`programs.paseo` manages the Paseo daemon's `~/.paseo/config.json` and its plugins, and installs Paseo itself: `desktop.enable` adds the app (`pkgs.paseo-desktop`) to `home.packages` and, on macOS, signs the copy in `~/Applications/Home Manager Apps` again (`signPaseo`), ad-hoc with the designated requirement `identifier "sh.paseo.desktop"` on the outer bundle so macOS keeps folder grants across updates (the default ad-hoc requirement is the cdhash, which changes every build); `cli.enable` (default on) puts `paseo` on `PATH`. `cli.package` defaults to the desktop package when the app is enabled, whose `bin/paseo` (added by `overlays.default`) links the CLI bundled in the app, and to `pkgs.paseo` (the server package) otherwise. A consumer's shared profile typically enables the module with the app, the daemon settings, and the shared plugin list. What belongs to one user or machine goes in that user's file, and the module deep-merges both: the model Paseo names agents with (`programs.paseo.settings.agents.metadataGeneration`, like the OMP roles), and plugins tied to the machine (`vpn`, for a work VPN in Tunnelblick). Versions refer to Paseo 0.11.0-beta.5; recheck after upgrades.
 
 The `paseo` input is a fork, `github:truelecter/paseo/local`: an upstream base (a release tag, plus cherry-picks of `main` fixes when the tag sits on a release branch that lacks fixes the previous base had; now `v0.15.2`) plus local-only commits and squashes of open upstream pull requests, listed with their reasons and drop conditions in the fork's `FORK.md`. Today the local-only commits are a revert of the OMP part of getpaseo/paseo#6090, so displayed OMP custom messages (`say`, GSD status and results) show as assistant replies again instead of collapsed tool rows, and Paseo's OMP host tools registered as `discoverable` (all but `update_agent` and `speak`), so OMP lists them as `xd://` catalog lines instead of sending every schema on every request (about 12k tokens less). A third local-only commit adds the Android build `sh.paseo.tlctr` with its own Firebase app and Expo project for push, and a workflow that publishes it on every push of `local` as a GitHub release for Obtainium; Home Manager doesn't use it. A fourth (branch `fix/nix-apply-dependency-patches`) makes Paseo's Nix builds apply its `patches/`: they install with `--ignore-scripts`, which skipped the postinstall, and the 0.12 web UI crashes on phone-sized screens without the `@gorhom/bottom-sheet` patch. A fifth (branch `fix/enriched-markdown-nested-lists`) moves `react-native-enriched-markdown` to the 20261017 nightly, which stops Android drawing a nested numbered list's numbers over its text. The upstream pull requests are getpaseo/paseo#6065 (OMP `grep`/`find` results shown in the chat), #5829 (images sent with a prompt kept in history, carried as the fork branch `pr/5829-user-image-history` on the base tag), our #6524 (a selected plugin theme painted from a saved copy until the host's plugins load), our #7450 (push notifications sent at high priority, so a dozing Android phone gets them on time), #7703 (a table right after a text line rendered as a table instead of literal pipes), and our #8070 (native touches and typing count as presence, so the phone isn't pushed "Agent finished" for the agent on screen). To move to a newer Paseo, follow "Move to a newer upstream" in `FORK.md`, then `nix flake update paseo` and run the end-to-end suite. Once upstream ships a way for extensions to show replies and discoverable host tools, point the input back at `github:getpaseo/paseo/<tag>`.
 
@@ -197,13 +203,13 @@ The `paseo` input is a fork, `github:truelecter/paseo/local`: an upstream base (
 
 - Entry points `index.client.ts(x)` and/or `index.server.ts`, with code only in `client/`, `server/`, or `shared/`. Imports use explicit `.ts` extensions: Bun, `tsc` (`allowImportingTsExtensions`), and Paseo's esbuild bundle all accept them.
 - Plugins that edit Paseo's rendered page (`wide-chat`, `project-groups`, `header-tab-name`) keep every DOM access in `client/web.ts`, gated on `Platform.OS === "web"`, and tie themselves to Paseo's DOM (test IDs, element nesting, Unistyles CSS variables). Check that DOM against the Paseo source for the pinned version (`~/.cache/agent-exploration-repos/paseo` at the matching tag) before relying on it; `project-groups/README.md` describes how to inspect the live DOM from a Paseo browser tab.
-- A command that ships with a plugin goes in `extraAttrs.<id>.passthru.cli` (today `backlog`: `cli/backlog`, a `writeShellApplication` with `curl` and `jq`). The module puts it on `PATH` for every configured plugin that has one. Keep `backlog`'s agent tools (`server/agent-tools.ts`), CLI, socket API (`server/http.ts`), and the `backlog` skill (`profiles/home/dev/_files/omp/skills/backlog/`) in step.
+- A command that ships with a plugin goes in `extraAttrs.<id>.passthru.cli` (today `backlog`: `cli/backlog`, a `writeShellApplication` with `curl` and `jq`). The module puts it on `PATH` for every configured plugin that has one. Keep `backlog`'s agent tools (`server/agent-tools.ts`), CLI, socket API (`server/http.ts`), and the `backlog` skill that the consumer gives its agents in step.
 - `paseo-plugin.json` with an `id` equal to the folder name, and `requirements.paseo`. The build checks the range against the pinned Paseo (`inputs.paseo`) and fails evaluation when it doesn't hold. Plugins tied to Paseo's DOM (`header-tab-name`, `project-groups`, `wide-chat`) use `~0.15.0`, so a Paseo bump to another minor stops the build until someone checks their selectors against the new version (run the end-to-end suite) and widens the range. Plugin-SDK-only plugins use `>=` the oldest Paseo that has every API they call (`server.addHook` and agent tools 0.14.0, `@getpaseo/plugin/client/ui` and `useTabState` 0.13.0). `semver.nix` understands space-joined `>=`, `>`, `<=`, `<`, `=`, `~`, `^` comparators on full versions and rejects anything else; a prerelease pinned Paseo (`0.11.0-beta.5`) is compared by its stable core (`0.11.0`), as Paseo's own check does.
 - A server entry's setup (`contribute(server)`) gets no Paseo client: `paseo` exists only in hook, RPC, and agent-tool contexts. Work that needs it at start waits for the first hook (`workspace-title-sync` subscribes to agent updates there), or shells out to the CLI (`tailscale-listener` reads and writes `daemon.hostnames` with `paseo daemon config`).
 - `package.json` with `version` (it ends up in the store path name; bump it when behavior changes), `typecheck` and `test` scripts. The build runs the files of the `test` script (`bun test <globs>`) in its `checkPhase`, with `_test-deps` in `node_modules`, so a failing test fails the package and the system build.
 - `dependencies` only for what the daemon doesn't provide. The build bundles them into the entries from a fixed-output `bun install --production --frozen-lockfile` (`paseo-plugins/node-modules.nix`), whose hash is in `nodeModulesHashes` in `paseo-plugins/default.nix` (today only `beautiful-chat`); no `node_modules` ships. After changing `package.json` or `bun.lock`, set the entry to `lib.fakeHash`, build, and copy the hash from the error. The same goes for `_test-deps` after changing its lock.
-- The build copies the folder minus tests, `bun.lock`, `.showcase/`, and `node_modules`, with the bundles in place of the source entries. Per-plugin derivation attributes go in `extraAttrs` there (`vpn` swaps the system curl in its Tunnelblick script for Nix's during tests). A plugin whose `meta.platforms` excludes the host is left out of the package set: `vpn` drives Tunnelblick through `osascript` and `system-health` samples `top`, `vm_stat`, and `lsof`, so both are Darwin-only and `pkgs.paseo-plugins.<id>` doesn't exist on Linux (enabling one there fails the module's `package` assertion; `profiles/home/dev/ai.nix` enables `system-health` with `lib.mkIf` on Darwin).
-- Plugin builds prefer the local machine (`preferLocalBuild`): on the `tl-mm4` remote builder the `vpn` script tests fail.
+- The build copies the folder minus tests, `bun.lock`, `.showcase/`, and `node_modules`, with the bundles in place of the source entries. Per-plugin derivation attributes go in `extraAttrs` there (`vpn` swaps the system curl in its Tunnelblick script for Nix's during tests). A plugin whose `meta.platforms` excludes the host is left out of the package set: `vpn` drives Tunnelblick through `osascript` and `system-health` samples `top`, `vm_stat`, and `lsof`, so both are Darwin-only and `pkgs.paseo-plugins.<id>` doesn't exist on Linux (enabling one there fails the module's `package` assertion; enable `system-health` with `lib.mkIf` on Darwin in a profile shared with Linux).
+- Plugin builds prefer the local machine (`preferLocalBuild`): on a remote macOS builder the `vpn` script tests fail.
 
 ### Change a plugin
 
@@ -217,14 +223,14 @@ The `paseo` input is a fork, `github:truelecter/paseo/local`: an upstream base (
 
 2. `nix build .#paseo-plugin-<id> -L`, which runs the tests again in the sandbox.
 3. Try it in the live Paseo without a switch (see "Develop a plugin without a switch" below), and run the end-to-end suite (`nix run .#paseo-plugins-e2e`).
-4. Update the plugin's `README.md`, bump `version` if behavior changed, and deploy with `darwin-rebuild switch --flake .#<host>`; the activation step reloads every plugin whose link target changed, and puts every hand-repointed link back on its store build.
+4. Update the plugin's `README.md`, bump `version` if behavior changed, and deploy as in step 6 of "Change an extension"; the consumer's switch runs the activation step, which reloads every plugin whose link target changed and puts every hand-repointed link back on its store build.
 
 ### Develop a plugin without a switch
 
-A switch needs sudo and brings along everything else that changed in the flake (OMP, other packages), so plugin work doesn't wait for one. `paseo-plugin-dev` (installed by the module with `programs.paseo.pluginDev.enable`, which `profiles/home/dev/ai.nix` sets) repoints a plugin's `~/.paseo/hm-plugins/<id>` link and reloads the plugin in the running daemon. `config.json` doesn't change, because Paseo keeps the link path and follows it only when it compiles the plugin.
+A switch needs sudo and brings along everything else that changed in the consumer's flake (OMP, other packages), so plugin work doesn't wait for one. `paseo-plugin-dev` (installed by the module with `programs.paseo.pluginDev.enable`) repoints a plugin's `~/.paseo/hm-plugins/<id>` link and reloads the plugin in the running daemon. `config.json` doesn't change, because Paseo keeps the link path and follows it only when it compiles the plugin.
 
 ```sh
-paseo-plugin-dev link wide-chat              # from anywhere in the checkout: links parts/ai/paseo-plugins/wide-chat
+paseo-plugin-dev link wide-chat              # from anywhere in this checkout: links paseo-plugins/wide-chat
 paseo-plugin-dev link wide-chat <folder>     # or an explicit folder, for example in a worktree
 paseo plugin reload wide-chat                # after each edit; `paseo plugin logs wide-chat` shows its output
 paseo-plugin-dev status                      # which plugins run their installed build, which a folder
@@ -237,7 +243,7 @@ paseo-plugin-dev restore wide-chat           # back to the installed build, relo
 
 ### Pin a workspace
 
-`paseo-pin-workspace` (installed by the module with `programs.paseo.pinWorkspace.enable`, which `profiles/home/dev/ai.nix` sets) pins a workspace to the top of the local daemon's sidebar, or unpins it. Paseo's CLI and MCP tools have no pin command, and unattended schedule runs need one: a blocked run starts a handoff agent in its own workspace and pins that workspace so the user sees it. It connects to the daemon at `listen` from `<home>/paseo.pid` (home is `PASEO_HOME` or `~/.paseo`; TCP only) with the token from `<home>/local-credential`, sends `workspace.pin.set.request` through `DaemonClient.setWorkspacePinned`, and prints `{"workspaceId":"...","pinnedAt":"<iso>"|null}`; a stopped daemon, a missing credential, or a rejected request (an unknown id: `Workspace not found`) exits nonzero with the reason on stderr. The pin is persisted as `pinnedAt` in `~/.paseo/projects/workspaces.json`.
+`paseo-pin-workspace` (installed by the module with `programs.paseo.pinWorkspace.enable`) pins a workspace to the top of the local daemon's sidebar, or unpins it. Paseo's CLI and MCP tools have no pin command, and unattended schedule runs need one: a blocked run starts a handoff agent in its own workspace and pins that workspace so the user sees it. It connects to the daemon at `listen` from `<home>/paseo.pid` (home is `PASEO_HOME` or `~/.paseo`; TCP only) with the token from `<home>/local-credential`, sends `workspace.pin.set.request` through `DaemonClient.setWorkspacePinned`, and prints `{"workspaceId":"...","pinnedAt":"<iso>"|null}`; a stopped daemon, a missing credential, or a rejected request (an unknown id: `Workspace not found`) exits nonzero with the reason on stderr. The pin is persisted as `pinnedAt` in `~/.paseo/projects/workspaces.json`.
 
 ```sh
 paseo-pin-workspace <workspace-id> [--unpin]    # before a switch: nix run .#paseo-pin-workspace -- <workspace-id>
@@ -257,7 +263,7 @@ An agent is the main editor of these plugins, and it usually runs inside the sam
 
 ### Add or remove a plugin
 
-- Add: create `paseo-plugins/<id>/` (copy a plugin with the same client/server shape), `git add -N` it, and list it in `programs.paseo.plugins`: in `profiles/home/dev/ai.nix`, or in a user's file when it is tied to that machine. `paseo-plugin-<id>` and `pkgs.paseo-plugins.<id>` appear automatically, and the plugin option defaults its `package` to that. The end-to-end harness loads it too; add `_e2e/specs/<id>.spec.ts` for it.
+- Add: create `paseo-plugins/<id>/` (copy a plugin with the same client/server shape), `git add -N` it, and list it in `programs.paseo.plugins` in the consumer's profile (or in a user's file when it is tied to that machine). `paseo-plugin-<id>` and `pkgs.paseo-plugins.<id>` appear automatically, and the plugin option defaults its `package` to that. The end-to-end harness loads it too; add `_e2e/specs/<id>.spec.ts` for it.
 - Remove: delete the folder, its `_e2e/specs/<id>.spec.ts`, and its `programs.paseo.plugins` entry; the next switch disables it and drops it from `config.json`, and it is gone after a Paseo restart. Its settings in `~/.paseo/plugin-settings/<id>` stay.
 
 ### End-to-end tests
@@ -275,11 +281,11 @@ nix run .#paseo-plugins-e2e -- --grep "Backlog"
 - On Linux the harness sets `FONTCONFIG_FILE` to a DejaVu-only fontconfig: Chromium aborts (`SkFontMgr_FontConfigInterface ... Not implemented`) without one, as in a build sandbox, and a fixed font set keeps text metrics the same across machines. The suite also runs inside a Linux build sandbox (loopback only, no network), which is how to check a Linux system from a Mac: a throwaway `runCommand` with `paseo-plugins-e2e` in `nativeBuildInputs`, `HOME` and `PASEO_E2E_ROOT` under `$TMPDIR`, built on a Linux builder.
 - The daemon's web UI (`features.webUi`) connects the page to the daemon without pairing. The specs seed projects and mock agents through `DaemonClient` from `@getpaseo/client` over the daemon's WebSocket, as Paseo's own e2e suite (`packages/app/e2e/` in its repository) does.
 - When the run fails or is interrupted, the harness keeps the temp folder and prints its path: `paseo/daemon.log` (with plugin output), `test-results/` (screenshot, trace, and browser console of each failed test), and `report/` (open it with `nix shell nixpkgs#playwright-test -c playwright show-report <dir>/report`). `PASEO_E2E_KEEP` set to any value keeps it after a pass too. Remove it when done.
-- `PASEO_E2E_SUITE=parts/ai/paseo-plugins/_e2e` runs the specs from the checkout instead of the store copy, so editing a spec needs no rebuild (plugin changes still do, or use an override).
+- `PASEO_E2E_SUITE=paseo-plugins/_e2e` runs the specs from the checkout instead of the store copy, so editing a spec needs no rebuild (plugin changes still do, or use an override).
 - `PASEO_E2E_PLUGIN_OVERRIDES="<id>=<dir> ..."` loads a plugin from another folder (a checkout, or a copy with a deliberate break), and `<id>=` with nothing after it leaves the plugin out; an unknown id stops the harness. Use it to check that a spec fails without its plugin: `PASEO_E2E_PLUGIN_OVERRIDES="wide-chat=" nix run .#paseo-plugins-e2e -- specs/wide-chat.spec.ts` must fail.
 - Not tested and not loaded: `todowrite2-tasks` (an archived OpenCode-only plugin; the mock provider can't emit `todowrite2` calls) and `vpn` (it reads the real Tunnelblick and OpenVPN Connect apps through `osascript`, and its plugin APIs, RPC and a sidebar screen, are covered by `backlog`). The suite must not depend on apps, windows, or services outside its own processes. `system-health` only reads system tools that every Mac has; it is loaded where its package exists (Darwin), and its spec skips itself on Linux.
 - `tailscale-listener` gets a stand-in for Tailscale: `PASEO_TAILSCALE_ADDRESS=::1` (the daemon listens on 127.0.0.1, so the port is free on IPv6 loopback, which macOS and Linux both have) and `PASEO_TAILSCALE_HOSTNAMES=e2e-host.e2e-tailnet.ts.net` in place of the MagicDNS lookup. Its spec loads the UI through `http://[::1]:<port>/`, checks that the names reached `daemon.hostnames` through `paseo daemon config set` (the CLI from `PASEO_CLI`, the package's `bin/paseo`), and that the running daemon then accepts the name as a Host header (the plugin saves during the daemon's start, before the daemon can apply it, and saves again until it does). Nothing is exposed beyond loopback.
-- CI: `.github/workflows/paseo-plugins-e2e.yaml` runs the suite on `ubuntu-latest` (x86_64) on every push that changes `flake.lock`, `flake.nix`, `parts/ai/**`, or the workflow, and on `workflow_dispatch`. A `changes` job (dorny/paths-filter) decides, and `paseo_e2e_aggregated`, a required check (in `shell/files/github-settings.nix`, which the dev shell writes to `.github/settings.yml`), passes when the suite passed or was not needed. On failure the run's temp root (`PASEO_E2E_ROOT` under `runner.temp`, with the report and daemon log) is uploaded as the `paseo-plugins-e2e` artifact. The weekly `flake-lock.yaml` PR is pushed with `PR_WF_ENABLED_TOKEN`, so the suite runs on it. It bumps Paseo only when the fork's `local` branch moved since the last lock, so mostly it catches nixpkgs-side breakage (node, Playwright, Chromium, plugin dependencies); a manual Paseo bump runs it too.
+- CI: `.github/workflows/paseo-plugins-e2e.yaml` runs the suite on `ubuntu-latest` (x86_64) on every push that changes `flake.lock`, `flake.nix`, `paseo-plugins/**`, or the workflow, and on `workflow_dispatch`. A `changes` job (dorny/paths-filter) decides, and `paseo_e2e_aggregated` always reports, so it can be a required check: it passes when the suite passed or was not needed. Nix comes from Determinate Nix with the read-only `nix-proxy.tlctr.me` cache in front of cache.nixos.org; CI pushes nothing. On failure the run's temp root (`PASEO_E2E_ROOT` under `runner.temp`, with the report and daemon log) is uploaded as the `paseo-plugins-e2e` artifact. The weekly `.github/workflows/flake-lock.yaml` opens a pull request with `nix flake update` and enables auto-merge; it pushes with the `PR_WF_ENABLED_TOKEN` secret (a token whose pushes start workflows, unlike `GITHUB_TOKEN`), so the suite runs on it. It bumps Paseo only when the fork's `local` branch moved since the last lock, so mostly it catches nixpkgs-side breakage (node, Playwright, Chromium, plugin dependencies); a manual Paseo bump runs it too.
 - Writing a spec: `support/fixtures.ts` gives `test` (pages can't reach port 6767, start past Paseo's first-run setup through its `@paseo:onboarding` localStorage key, a failed test gets the browser console attached, `client` is a `DaemonClient`, `seed(name)` creates a git repository project that is removed after the test), `openApp`, and `openAgent`. `support/paseo.ts` creates mock agents (`e2e-fast-stream` ends a turn in about 2 s before any tool call, `ten-second-stream` also makes read, grep, edit, and bash calls; see `packages/server/src/server/agent/providers/mock-load-test-agent.ts` in Paseo) and app routes. `support/env.ts` has the harness values, such as the daemon home and a plugin's loaded folder. Prefer Paseo's `data-testid`s and the plugin's own markers to text and CSS classes. Every spec must fail without its plugin; check that with an override.
 - `@getpaseo/client` in `_e2e/package.json` is pinned to the Paseo version. Bump it with Paseo: update `package.json`, run `bun install` in `_e2e/` to update `bun.lock` (then remove `node_modules`), and refresh the hash in `_e2e/node-modules.nix` (`lib.fakeHash`, build, copy the hash from the error). `paseo-pin-workspace` uses the same `node_modules`; check it after the bump (see "Pin a workspace").
 
@@ -295,11 +301,16 @@ Test `paseo-sync.sh` against an isolated daemon, never `~/.paseo`: write a `conf
 - SearXNG exits on the default `ultrasecretkey`. Without `settings.server.secret_key` and a custom `settingsFile`, the launcher generates `$XDG_STATE_HOME/searxng/secret_key` once and exports it as `SEARXNG_SECRET`; a `SEARXNG_SECRET` from `environmentFile` wins.
 - `redisCreateLocally` runs Valkey as a second user service (`searxng-valkey`) on `$XDG_STATE_HOME/searxng/valkey.sock`.
 - macOS logs go to `~/Library/Logs/searxng.log`; Linux logs go to the journal (`journalctl --user -u searxng`). The built-in server logs queries.
-- `profiles/home/dev/ai.nix` enables it on `127.0.0.1:8888` with JSON output and a 6 s `outgoing.request_timeout` (the 3 s default times out every engine at once on a slow network), and routes OMP's `web_search` to OMP's built-in `web/searxng` provider (`modelRoles.web`, `searxng.endpoint`, `searxng.engines`), falling back to `web/exa` and `web/parallel`. The default scraped engines (DuckDuckGo, Brave, Startpage, Qwant) answer bots with captchas or rate limits, plain `google` answers 403 and `mojeek` is inactive upstream, so `searxng.engines` picks ones that return results: `google cse, bing, yahoo, github, wikipedia`. OMP passes them as `engines=`, which also runs engines SearXNG disables by default (`bing`, `yahoo`); inactive or unknown ones are dropped silently, so re-check the list after a SearXNG update with `curl -s 'http://127.0.0.1:8888/search?q=test&format=json&engines=<name>' | jq '.results|length, .unresponsive_engines'`. Check from the shell: `omp search --compact -l 3 '<query>'` shows `Provider: SearXNG`.
+- A typical setup enables it on `127.0.0.1:8888` with JSON output and a 6 s `outgoing.request_timeout` (the 3 s default times out every engine at once on a slow network), and routes OMP's `web_search` to OMP's built-in `web/searxng` provider (`modelRoles.web`, `searxng.endpoint`, `searxng.engines`), falling back to `web/exa` and `web/parallel`. The default scraped engines (DuckDuckGo, Brave, Startpage, Qwant) answer bots with captchas or rate limits, plain `google` answers 403 and `mojeek` is inactive upstream, so `searxng.engines` picks ones that return results: `google cse, bing, yahoo, github, wikipedia`. OMP passes them as `engines=`, which also runs engines SearXNG disables by default (`bing`, `yahoo`); inactive or unknown ones are dropped silently, so re-check the list after a SearXNG update with `curl -s 'http://127.0.0.1:8888/search?q=test&format=json&engines=<name>' | jq '.results|length, .unresponsive_engines'`. Check from the shell: `omp search --compact -l 3 '<query>'` shows `Provider: SearXNG`.
 - Test it like the OMP module: build a throwaway `homeManagerConfiguration` with `f.homeModules.searxng`, then run the launcher from the generated plist (`<result>/LaunchAgents/org.nix-community.home.searxng.plist`) and query `http://127.0.0.1:8888/search?q=test&format=json` (needs `settings.search.formats = ["html" "json"]`).
+
+## Commits
+
+- Conventional Commits, scoped by area: `omp` (the module and extensions), `gsd`, `paseo` (the module, plugins, end-to-end suite, `paseo-pin-workspace`), `searxng`, `ci`, `repo` (flake, lock, docs). For example `fix(paseo): ...`, `deps(repo): ...`.
+- Keep the commit body minimal: a few words at most, and none when the subject line already says it all.
 
 ## Before you finish
 
-- `nix build` of every package you touched, and of the host's Home Manager generation.
+- `nix build` of every package you touched, and of the consumer's Home Manager generation against this checkout (`--override-input`).
 - The smoke run that exercises the change, with its output.
 - READMEs and this file in step with the change.

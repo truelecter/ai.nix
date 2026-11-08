@@ -33,7 +33,7 @@ It differs from the original gsd-watch where GSD's current files differ from wha
 
 ## Develop
 
-Installed through `programs.paseo.plugins.gsd-watch` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link gsd-watch` from your checkout: Paseo then loads this folder, `paseo plugin reload gsd-watch` picks up each edit, and `paseo plugin logs gsd-watch` shows its output. `paseo-plugin-dev restore gsd-watch` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.gsd-watch` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link gsd-watch` from your checkout: Paseo then loads this folder, `paseo plugin reload gsd-watch` picks up each edit, and `paseo plugin logs gsd-watch` shows its output. `paseo-plugin-dev restore gsd-watch` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

@@ -27,7 +27,7 @@ The server side keeps the items in `~/.local/share/paseo-backlog/items.json` (`P
 - Agent tools: `backlog_add`, `backlog_list`, `backlog_show`, `backlog_update`, and `backlog_remove` (`server/agent-tools.ts`), attached to every agent through `server.addHook("agent.open.before")`. They call the store directly, with the socket API's validation, and record the calling agent and its working directory the way the CLI does; `agentId` names another chat instead. Paseo delivers them over its agent tool transport (MCP or native, per provider) under the same gates as Paseo's own tools, and open chats get them when their session reopens: after the plugin starts or reloads, each open session reopens before its next idle prompt.
 - The `backlog` CLI, for agents without the tools (a disabled Paseo tool injection, a provider policy that withholds them, a shell outside Paseo). It talks to a small JSON API on the Unix socket `backlog.sock` in the same folder, readable only by your user, with `curl`, so anything that can run a shell command can use it.
 
-The `backlog` skill (`profiles/home/dev/_files/omp/skills/backlog/` for OMP) tells agents when and how to use them, preferring the tools. Keep it, the tools, the CLI, and `server/http.ts` in step.
+The `backlog` skill, kept with the consumer's OMP skills, tells agents when and how to use them, preferring the tools. Keep it, the tools, the CLI, and `server/http.ts` in step.
 
 The socket API:
 
@@ -70,7 +70,7 @@ backlog rm 1
 
 ## Develop
 
-Installed through `programs.paseo.plugins.backlog` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link backlog` from your checkout: Paseo then loads this folder, `paseo plugin reload backlog` picks up each edit, and `paseo plugin logs backlog` shows its output. `paseo-plugin-dev restore backlog` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.backlog` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link backlog` from your checkout: Paseo then loads this folder, `paseo plugin reload backlog` picks up each edit, and `paseo plugin logs backlog` shows its output. `paseo-plugin-dev restore backlog` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

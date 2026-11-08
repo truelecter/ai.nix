@@ -3,8 +3,8 @@
 # Paseo keeps the link path in config.json and follows the link only when it compiles the plugin.
 # The next switch puts every link back on its installed build (the links are `force`d) and reloads it.
 #
-#   paseo-plugin-dev link <id> [<folder>]   default folder: parts/ai/paseo-plugins/<id> in the
-#                                           git checkout around the current directory
+#   paseo-plugin-dev link <id> [<folder>]   default folder: paseo-plugins/<id> in the git
+#                                           checkout of this repository around the current directory
 #   paseo-plugin-dev restore <id>
 #   paseo-plugin-dev status
 #
@@ -55,7 +55,7 @@ link)
     folder=$3
   else
     top=$(git rev-parse --show-toplevel 2>/dev/null) || die "not in a git checkout; pass the plugin folder"
-    folder=$top/parts/ai/paseo-plugins/$id
+    folder=$top/paseo-plugins/$id
   fi
   [[ -d $folder ]] || die "no folder $folder"
   folder=$(cd "$folder" && pwd)

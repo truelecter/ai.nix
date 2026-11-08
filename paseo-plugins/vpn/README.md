@@ -49,7 +49,7 @@ This depends on the app's internals as of OpenVPN Connect 3.8.1 and can break on
 
 ## Develop
 
-Installed through `programs.paseo.plugins.vpn` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link vpn` from your checkout: Paseo then loads this folder, `paseo plugin reload vpn` picks up each edit, and `paseo plugin logs vpn` shows its output. `paseo-plugin-dev restore vpn` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.vpn` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link vpn` from your checkout: Paseo then loads this folder, `paseo plugin reload vpn` picks up each edit, and `paseo plugin logs vpn` shows its output. `paseo-plugin-dev restore vpn` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

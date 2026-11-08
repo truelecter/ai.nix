@@ -33,7 +33,7 @@ The screen samples when it opens and on **Refresh**. **Auto** samples again ever
 
 ## Develop
 
-Installed through `programs.paseo.plugins.system-health` (the parts/ai/homeModules/paseo.nix Home Manager module) on Darwin. To work on it without a switch, run `paseo-plugin-dev link system-health` from your checkout: Paseo then loads this folder, `paseo plugin reload system-health` picks up each edit, and `paseo plugin logs system-health` shows its output. `paseo-plugin-dev restore system-health` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.system-health` (this flake's `homeModules.paseo` Home Manager module) on Darwin. To work on it without a switch, run `paseo-plugin-dev link system-health` from your checkout: Paseo then loads this folder, `paseo plugin reload system-health` picks up each edit, and `paseo plugin logs system-health` shows its output. `paseo-plugin-dev restore system-health` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

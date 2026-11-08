@@ -14,7 +14,7 @@ It listens on this machine's Tailscale IPv4 address (100.64.0.0/10) on the daemo
 
 ## Develop
 
-Installed through `programs.paseo.plugins.tailscale-listener` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link tailscale-listener` from your checkout: Paseo then loads this folder, `paseo plugin reload tailscale-listener` picks up each edit, and `paseo plugin logs tailscale-listener` shows its output. `paseo-plugin-dev restore tailscale-listener` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.tailscale-listener` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link tailscale-listener` from your checkout: Paseo then loads this folder, `paseo plugin reload tailscale-listener` picks up each edit, and `paseo plugin logs tailscale-listener` shows its output. `paseo-plugin-dev restore tailscale-listener` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

@@ -2,7 +2,7 @@
 # The harness (`run.sh`) starts an isolated Paseo daemon with every plugin from its store build,
 # opens the daemon's web UI in headless Chromium through Playwright, and stops the daemon on exit.
 # It needs nothing outside its own processes, so it runs on Linux and macOS and in CI
-# (.github/workflows/paseo-plugins-e2e.yaml). See parts/ai/AGENTS.md, "End-to-end tests".
+# (.github/workflows/paseo-plugins-e2e.yaml). See AGENTS.md, "End-to-end tests".
 {
   lib,
   stdenvNoCC,

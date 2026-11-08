@@ -55,7 +55,7 @@
         defaultText = literalExpression "pkgs.paseo-plugins.<name> or null";
         description = ''
           The plugin directory (with `paseo-plugin.json`). Defaults to the package of the same name
-          from `overlays.ai`.
+          from `overlays.default`.
         '';
       };
 
@@ -74,7 +74,7 @@ in {
       enable = mkEnableOption "the Paseo desktop app; on macOS activation signs the copied app again (ad hoc)";
 
       package = mkPackageOption pkgs "paseo-desktop" {
-        extraDescription = "`overlays.ai` adds `bin/paseo`, the CLI bundled in the app.";
+        extraDescription = "`overlays.default` adds `bin/paseo`, the CLI bundled in the app.";
       };
     };
 
@@ -86,7 +86,7 @@ in {
           Whether to put the Paseo CLI on PATH and use it during activation to apply plugin changes
           to a running daemon. Without it, or when the daemon isn't running, only
           {file}`~/.paseo/config.json` is written and the daemon picks it up on its next start. The
-          desktop package from `overlays.ai` has `bin/paseo` of its own, so with the desktop app
+          desktop package from `overlays.default` has `bin/paseo` of its own, so with the desktop app
           enabled `paseo` stays on PATH either way.
         '';
       };
@@ -125,7 +125,7 @@ in {
       enable = mkEnableOption "`paseo-pin-workspace`, which pins or unpins a workspace in the local daemon's sidebar (Paseo's CLI and MCP tools have no pin command)";
 
       package = mkPackageOption pkgs "paseo-pin-workspace" {
-        extraDescription = "From `overlays.ai`.";
+        extraDescription = "From `overlays.default`.";
       };
     };
 

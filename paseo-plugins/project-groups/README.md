@@ -53,7 +53,7 @@ The plugin API cannot add rows to the project list, so on desktop and web `clien
 
 ## Develop
 
-Installed through `programs.paseo.plugins.project-groups` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link project-groups` from your checkout: Paseo then loads this folder, `paseo plugin reload project-groups` picks up each edit, and `paseo plugin logs project-groups` shows its output. `paseo-plugin-dev restore project-groups` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.project-groups` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link project-groups` from your checkout: Paseo then loads this folder, `paseo plugin reload project-groups` picks up each edit, and `paseo plugin logs project-groups` shows its output. `paseo-plugin-dev restore project-groups` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

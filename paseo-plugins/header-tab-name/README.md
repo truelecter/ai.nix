@@ -21,7 +21,7 @@ There is no server entry, so no subprocess runs.
 
 ## Develop
 
-Installed through `programs.paseo.plugins.header-tab-name` (the parts/ai/homeModules/paseo.nix Home Manager module). To work on it without a switch, run `paseo-plugin-dev link header-tab-name` from your checkout: Paseo then loads this folder, `paseo plugin reload header-tab-name` picks up each edit, and `paseo plugin logs header-tab-name` shows its output. `paseo-plugin-dev restore header-tab-name` goes back to the installed build. See `parts/ai/AGENTS.md`.
+Installed through `programs.paseo.plugins.header-tab-name` (this flake's `homeModules.paseo` Home Manager module). To work on it without a switch, run `paseo-plugin-dev link header-tab-name` from your checkout: Paseo then loads this folder, `paseo plugin reload header-tab-name` picks up each edit, and `paseo plugin logs header-tab-name` shows its output. `paseo-plugin-dev restore header-tab-name` goes back to the installed build. See `AGENTS.md` at the repository root.
 
 ```sh
 nix shell --inputs-from "$(git rev-parse --show-toplevel)" latest#bun \

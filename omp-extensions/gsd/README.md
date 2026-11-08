@@ -4,7 +4,7 @@ Lazy entry for [gsd-omp](https://github.com/tchivs/gsd-omp), the OMP port of GSD
 
 ## Why
 
-GSD ships 35 agents and 53 skills (after the ignores in `profiles/home/dev/ai.nix`). OMP lists every agent in the `task` tool description and every skill in the system prompt, so each request carried about 5k prompt tokens for GSD (4,965 claude-v5 tokens on a first request with OMP 18.6.1, 4,988 with 18.8.4), also in repositories that don't use it. Settings can't fix that per project: the Home Manager overlay outranks a project's `.omp/config.yml`, and list settings replace instead of merging.
+GSD ships 35 agents and 53 skills (counted after the `skills.ignoredSkills` of the profile it was measured with). OMP lists every agent in the `task` tool description and every skill in the system prompt, so each request carried about 5k prompt tokens for GSD (4,965 claude-v5 tokens on a first request with OMP 18.6.1, 4,988 with 18.8.4), also in repositories that don't use it. Settings can't fix that per project: the Home Manager overlay outranks a project's `.omp/config.yml`, and list settings replace instead of merging.
 
 ## What it does
 

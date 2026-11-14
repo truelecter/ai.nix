@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@v3
@@ -21,7 +21,7 @@ jobs:
           summarize: false
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@v21
+        uses: DeterminateSystems/update-flake-lock@v29
         id: ufl
         with:
           token: ${{ secrets.PR_WF_ENABLED_TOKEN }}

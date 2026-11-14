@@ -14,10 +14,10 @@ jobs:
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Check for changes the suite depends on
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -42,7 +42,7 @@ jobs:
           sudo mount --bind /mnt/nix /nix
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Determinate Nix retries a NAR download that broke mid-stream even when the server doesn't
       # support ranged requests. nix-proxy is a read-only cache in front of cache.nixos.org.
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload the daemon home, logs, and Playwright report
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: paseo-plugins-e2e
           path: |

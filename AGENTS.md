@@ -25,6 +25,7 @@ paseo-plugins/
 packages/gsd-omp/             the gsd-omp CLI (buildNpmPackage), see its README for updates
 packages/paseo-pin-workspace/ `paseo-pin-workspace`: pins or unpins a workspace in the local Paseo daemon's sidebar
 .github/workflows/            the end-to-end suite in CI, the weekly flake.lock update
+.github/settings.yml          repo settings and `main` protection, applied by the Settings app
 ```
 
 Outputs, all from `flake.nix`:

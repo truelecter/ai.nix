@@ -10,12 +10,24 @@ Paseo's default sidebar is a flat list of projects, each with its workspaces. A 
 
 Select the view under **Settings > Sidebar > Sidebar view > Project groups**. Paseo keeps its header, header items, and footer; the view renders pinned workspaces, then the grouped projects, each with its workspaces. It shows projects of every connected host in one list; with more than one host, project rows also show the host's name.
 
-Rows navigate with one tap or click: a workspace opens it, a project or group row collapses or expands it, and `+` on a project starts a new workspace there. Every other control sits behind **Edit** at the top of the view (and a long press on a row, which opens that row's actions):
+Rows navigate with one tap or click: a workspace opens it, and a project or group row collapses or expands it. Rows look like Paseo's default view: a project shows its icon (its own, or Paseo's lettered square in the same color), turning into the chevron on hover; a workspace shows Paseo's status mark (the turning ring while it runs, an alert when it needs input, a dot when it is ready to review, a faint dot when idle, its kind with a red dot when it failed) and, at its end, its last interaction (`now`, `5m`, `2h`, `3d`, then the date). Row text can't be selected. With a pointer, a row's controls appear only while it is hovered and take the place of the time; touch layouts always show the time and `⋮`:
 
-- Project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`), **Remove from group**, **New workspace**.
+- Workspace: the archive button and the `⋮` menu. A local checkout archives at once with a pointer; a worktree (its folder goes with it) asks first. On touch layouts Archive sits in the menu, where it asks first too.
+- Project: `+` starts a new workspace there, and the `⋮` menu.
+
+A right-click (long press on touch) opens the same menu as `⋮`, a dropdown at the pointer and a bottom sheet on touch layouts:
+
+- Project: **Open project settings**, **Open in new window** and **Open in file manager** (desktop app only), **Move to group**, **Remove from group**, **Remove project** (asks first; files on disk stay).
+- Workspace: **Copy path**, **Copy branch name**, **Rename**, **Mark as read** or **Mark as unread**, **Pin** or **Unpin**, **Labels** (check the host's labels, or type a new one), **Open in file manager** (desktop app only), **Archive**.
+- Group: **Rename group**, **Ungroup**.
+
+Text and row sizes follow Paseo's sidebar at its default UI font size: 14pt text and 36pt rows on the desktop and web, 15pt text and 44pt rows on touch layouts. The plugin theme carries colors only, so a custom **Interface font size** in Paseo's Appearance settings doesn't reach the view, and the status colors are Paseo's, picked by the theme's lightness.
+
+Grouping and order sit behind the pencil at the top of the view (a check mark leaves edit mode, which itself is not saved). Workspace actions stay in the row menus:
+
+- Project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`) and **Remove from group**.
 - Group: **Rename** (also moves subgroups; type a path with `/` to move it under another group) and **Ungroup** (removes one level: projects move to the parent group, or out of groups at the top level). Both also apply to projects grouped only by their name.
-- Workspace: **Pin** or **Unpin**, **Rename**, **Archive** (asks to confirm).
-- Order: in edit mode every project, group, and workspace row has move up and move down buttons. A group moves with everything in it. **Done** leaves edit mode; edit mode itself is not saved.
+- Order: every project, group, and workspace row has move up and move down buttons. A group moves with everything in it.
 
 A project's group comes from, in order:
 
@@ -43,7 +55,9 @@ Paseo evaluates the client entry once per connected host but renders the sidebar
 
 The view uses only React Native primitives and the SDK's `useProjects`, `useWorkspaces`, and `useWorkspace`: project names come from one `groupBy` query, each row reads its own workspaces and status, and a collapsed group's status comes from a `groupBy` on workspace indicators. Colors come from the theme tokens Paseo passes to the view.
 
-`client/groups.ts` (grouping, placement, rename and ungroup rewrites), `client/assignments.ts` (where assignments live across hosts, and the 0.15 migration), and `client/order.ts` (ordering and moves) are pure functions with tests. `client/web.ts` holds the only DOM access, the one-time read of the 0.15 collapsed groups.
+`client/groups.ts` (grouping, placement, rename and ungroup rewrites), `client/assignments.ts` (where assignments live across hosts, and the 0.15 migration), and `client/order.ts` (ordering and moves) are pure functions with tests. `client/web.ts` holds the web and desktop-only access: the one-time read of the 0.15 collapsed groups, opening **Open project settings** in the window (a pushed route plus `popstate`, which Paseo's web router follows; phones open the `paseo://` link instead), and the desktop app's `window.paseoDesktop` bridge for new windows and the file manager, the same calls Paseo's own project menu makes.
+
+The SDK has no call to remove a project, read a project's icon, or mark a workspace read or unread, so those go through plugin RPCs to the project's host. Its server (`server/daemon.ts`) keeps one connection to its own daemon, opened as Paseo's CLI does from the address in `<PASEO_HOME>/paseo.pid` and the token in `<PASEO_HOME>/local-credential`, and sends the same requests as Paseo's sidebar (`project.remove.request`, `project.icon.get.request`, clearing a workspace's attention, `markWorkspaceUnread`). That bundles `@getpaseo/client` into the server entry (about 10 MB), which adds about a second to the plugin's start. Projects of hosts that don't run the plugin get the lettered icon and no **Remove project** or read state items. Mark as unread doesn't unfocus the workspace as Paseo's does, so on a workspace you are looking at it can clear again at once.
 
 ## Limits
 

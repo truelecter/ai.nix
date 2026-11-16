@@ -31,6 +31,7 @@
   nodeModulesHashes = {
     _test-deps = "sha256-YnihTMJCPRm7Vrhm/n3RZIfwu+ENioFwsdWRCxb5KbE=";
     beautiful-chat = "sha256-3SeL5sqPpd/aabrdeU5GjYaqDYdy7vCE2fs4ddKXci4=";
+    project-groups = "sha256-xY0VBmgboupVUDJjfH8kFrtcvQGC2nS+tQd6VVwLRq0=";
   };
 
   nodeModules = name: {production}:

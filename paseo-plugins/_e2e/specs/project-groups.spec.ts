@@ -141,3 +141,92 @@ test("edit mode reorders projects and the order survives a reload", async ({ pag
   await expect(secondRow).toBeVisible();
   await expect.poll(above).toBe(false);
 });
+
+test("a pinned workspace archives from its row without edit mode", async ({
+  page,
+  seed,
+  client,
+}) => {
+  const workspace = await seed("project-groups-archive");
+  await client.setWorkspacePinned(workspace.workspaceId, true);
+  await openGroups(page);
+
+  const row = page
+    .getByTestId("project-groups-pinned")
+    .getByTestId(`project-groups-workspace-${refKey(workspace.workspaceId)}`);
+  const archive = page.getByTestId(`project-groups-workspace-${refKey(workspace.workspaceId)}-archive`);
+  // As in Paseo's sidebar: the last interaction until hovered, then the row's buttons in its place.
+  await expect(row.locator("..").getByTestId("project-groups-workspace-time")).toHaveText(
+    /^(now|\d+m)$/,
+  );
+  await expect(archive).toHaveCount(0);
+  await row.hover();
+  // A local checkout archives at once with a pointer, as in Paseo's own sidebar.
+  await archive.click();
+  await expect
+    .poll(async () =>
+      (await client.fetchWorkspaces()).entries.some((entry) => entry.id === workspace.workspaceId),
+    )
+    .toBe(false);
+  await expect(row).toHaveCount(0);
+});
+
+test("the project menu opens the project's settings and removes the project", async ({
+  page,
+  seed,
+  client,
+}) => {
+  const workspace = await seed("project-groups-menu");
+  await openGroups(page);
+
+  const testID = `project-groups-project-${refKey(workspace.projectId)}`;
+  await page.getByTestId(testID).hover();
+  await page.getByTestId(`${testID}-actions`).click();
+  await page.getByTestId(`${testID}-menu-settings`).click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname ===
+      `/settings/hosts/${encodeURIComponent(env.serverId)}/projects/${encodeURIComponent(workspace.projectId)}`,
+  );
+
+  await openGroups(page);
+  await page.getByTestId(testID).hover();
+  await page.getByTestId(`${testID}-actions`).click();
+  await page.getByTestId(`${testID}-menu-remove`).click();
+  await expect(page.getByTestId(`${testID}-actions-menu`)).toContainText(
+    "Files on disk will not be changed.",
+  );
+  await page.getByTestId(`${testID}-actions-menu-confirm`).click();
+  await expect
+    .poll(async () =>
+      (await client.listProjects()).projects.some(
+        (project) => project.projectId === workspace.projectId,
+      ),
+    )
+    .toBe(false);
+  await expect(page.getByTestId(testID)).toHaveCount(0);
+});
+
+test("a right-click on a workspace opens its menu, which pins it and sets a label", async ({
+  page,
+  seed,
+  client,
+}) => {
+  const workspace = await seed("project-groups-context");
+  await openGroups(page);
+
+  const testID = `project-groups-workspace-${refKey(workspace.workspaceId)}`;
+  const entry = async () =>
+    (await client.fetchWorkspaces()).entries.find((item) => item.id === workspace.workspaceId);
+
+  await page.getByTestId(testID).click({ button: "right" });
+  await page.getByTestId(`${testID}-menu-pin`).click();
+  await expect.poll(async () => (await entry())?.pinnedAt ?? null).not.toBeNull();
+
+  await page.getByTestId(testID).click({ button: "right" });
+  await page.getByTestId(`${testID}-menu-labels`).click();
+  const input = page.getByTestId("project-groups-label-input");
+  await input.fill("E2E label");
+  await input.press("Enter");
+  await expect.poll(async () => (await entry())?.labels ?? []).toContain("E2E label");
+});

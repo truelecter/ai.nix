@@ -7,6 +7,12 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { settingsRpc } from "@getpaseo/plugin";
 import { useSyncExternalStore } from "react";
+import {
+  markWorkspaceRead,
+  markWorkspaceUnread,
+  projectIcon,
+  removeProject,
+} from "../shared/daemon.ts";
 import { emptyGroupDoc, groupChanges, groupSettings, type GroupDoc } from "../shared/settings.ts";
 import type { DocChange, HostProjects } from "./assignments.ts";
 import { createDocumentSync, type DocumentStatus } from "./sync.ts";
@@ -16,6 +22,12 @@ export interface HostGroups extends HostProjects {
   update(change: DocChange): Promise<void>;
   /** Re-reads the document and this host's project listing. */
   refresh(): Promise<void>;
+  /** Removes one of this host's projects from the sidebar; files on disk stay. */
+  removeProject(projectId: string): Promise<void>;
+  /** A `data:` URI of the project's icon, or null for the lettered square. */
+  projectIcon(projectId: string): Promise<string | null>;
+  markRead(workspaceId: string): Promise<void>;
+  markUnread(workspaceId: string): Promise<void>;
 }
 
 interface Registry {
@@ -26,7 +38,7 @@ interface Registry {
 
 // Bump the version when `HostGroups` changes shape, so bundles of different versions (one host
 // updated before another) never read each other's entries.
-const REGISTRY = Symbol.for("paseo-plugin:project-groups:hosts:v1");
+const REGISTRY = Symbol.for("paseo-plugin:project-groups:hosts:v3");
 
 // The slot holds only what this module stores there, under its own versioned symbol.
 const holder = globalThis as typeof globalThis & { [REGISTRY]?: Registry };
@@ -120,6 +132,20 @@ export function startHostGroups(client: PluginClientContext): () => void {
       projectKeys,
       update: sync.update,
       refresh,
+      removeProject: async (projectId) => {
+        await client.rpc(removeProject, { projectId });
+        await refresh();
+      },
+      projectIcon: async (projectId) => {
+        const { icon } = await client.rpc(projectIcon, { projectId });
+        return icon ? `data:${icon.mimeType};base64,${icon.data}` : null;
+      },
+      markRead: async (workspaceId) => {
+        await client.rpc(markWorkspaceRead, { workspaceId });
+      },
+      markUnread: async (workspaceId) => {
+        await client.rpc(markWorkspaceUnread, { workspaceId });
+      },
     });
     publish(store);
   }

@@ -15,10 +15,8 @@ async function composerWidth(page: Page): Promise<number> {
 
 async function setWidth(page: Page, current: string, next: string) {
   await openApp(page, `/settings/hosts/${env.serverId}/plugins`);
-  await page
-    .getByRole("button", { name: "Actions for wide-chat", exact: true })
-    .click();
-  await page.getByRole("menuitem", { name: "Chat width", exact: true }).click();
+  // The row opens the plugin's page, which shows its first settings screen inline.
+  await page.getByTestId("plugin-row-wide-chat").click();
   await page
     .getByRole("button", { name: `Width: ${current}`, exact: true })
     .click();

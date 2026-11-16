@@ -90,6 +90,8 @@ export const sessionSchema = z.object({
   title: z.string().nullable(),
   status: z.string().nullable(),
   archived: z.boolean(),
+  /** Its agent is a background agent (a helper hidden from Paseo's tabs and lists). */
+  background: z.boolean(),
   cwd: z.string().nullable(),
   lastActivityAt: z.string().nullable(),
   ompVersion: z.string().nullable(),
@@ -107,7 +109,10 @@ export type Session = z.infer<typeof sessionSchema>;
 export const agentsSchema = z.object({
   sessions: z.array(sessionSchema),
   installedOmpVersion: z.string().nullable(),
+  /** Agents that aren't archived, background agents included. */
   liveAgents: z.number(),
+  /** The background agents among `liveAgents`. */
+  backgroundAgents: z.number(),
   archivedAgents: z.number(),
   /** Set when Paseo's agent list could not be read. */
   error: z.string().nullable(),

@@ -17,7 +17,8 @@ There is no server entry, so no subprocess runs.
 ## Limits
 
 - Desktop app and browser only. iOS and Android render natively, and the compact layout already shows the open tab in its tab switcher.
-- It depends on Paseo's DOM, checked against Paseo 0.13.0 (the end-to-end suite): the `workspace-header-title` and `workspace-tabs-row` test IDs, `aria-selected` on tab chips, the focused pane's chip being filled with the `surface2` theme color, and the Explorer sidebar's tabs sitting inside `workspace-explorer-sidebar` (they are skipped; since 0.11 the Explorer draws the same tabs row as the panes). A Paseo update that changes these can break it; the usual symptom is the name disappearing, and the header then looks as stock.
+- The compact header gets no name. Since Paseo 0.16 the desktop layout uses it too, for a single pane narrower than 500 px (a narrow window with the sidebar docked): that pane drops its tabs row and shows the open tab in the header's tab switcher. Widen the window and the name comes back.
+- It depends on Paseo's DOM, checked against Paseo 0.16 (the end-to-end suite): the `workspace-header-title`, `workspace-tabs-row`, and `workspace-pane-<id>` test IDs, `aria-selected` on tab chips, the focused pane's chip being filled with the `surface2` theme color, and the Explorer sidebar's tabs sitting inside `workspace-explorer-sidebar` (they are skipped; since 0.11 the Explorer draws the same tabs row as the panes). A title inside a pane takes its name only from that pane's tabs row. A Paseo update that changes these can break it; the usual symptom is the name disappearing, and the header then looks as stock.
 
 ## Develop
 

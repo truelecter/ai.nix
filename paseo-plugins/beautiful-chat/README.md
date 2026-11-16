@@ -46,7 +46,7 @@ On the phone and tablet a code block is one piece of text, so a selection can ru
 
 ## Settings
 
-**Settings -> Plugins -> Beautiful Chat -> Chat presentation** has three settings. **Text size** (Small, Default, Large, or Larger) scales every font size and line height in the plugin's own cards and leaves paddings, icons, and corners alone. **Show times** (on by default) shows each card's time. **Combine tool calls** (on by default) folds a turn's tool calls into one summary line; off draws every call as its own row. Cards on screen follow every change at once. The settings are saved in the window's local storage. Paseo's Appearance font settings cover everything else; a plugin cannot read them.
+In Paseo 0.16, open **Settings > Plugins**, then the **Settings** cog on the `beautiful-chat` row. **Chat presentation** has three settings. **Text size** (Small, Default, Large, or Larger) scales every font size and line height in the plugin's own cards and leaves paddings, icons, and corners alone. **Show times** (on by default) shows each card's time. **Combine tool calls** (on by default) folds a turn's tool calls into one summary line; off draws every call as its own row. Cards on screen follow every change at once. The settings are saved in the window's local storage. Paseo's Appearance font settings cover everything else; a plugin cannot read them.
 
 ## Develop
 

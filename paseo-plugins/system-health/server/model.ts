@@ -54,6 +54,8 @@ export interface AgentInfo {
   title: string | null;
   status: string;
   archived: boolean;
+  /** Created as a background agent: a helper Paseo hides from tabs, lists, and attention. */
+  background: boolean;
   cwd: string;
   sessionId: string | null;
   lastActivityAt: string | null;
@@ -325,6 +327,7 @@ export function buildSnapshot(input: SnapshotInput): Snapshot {
       title: agent?.title ?? null,
       status: agent?.status ?? null,
       archived: agent?.archived ?? false,
+      background: agent?.background ?? false,
       cwd: agent?.cwd ?? null,
       lastActivityAt: agent?.lastActivityAt ?? null,
       ompVersion: version,
@@ -379,6 +382,7 @@ export function buildSnapshot(input: SnapshotInput): Snapshot {
       sessions,
       installedOmpVersion: installed,
       liveAgents: agents.filter((agent) => !agent.archived).length,
+      backgroundAgents: agents.filter((agent) => !agent.archived && agent.background).length,
       archivedAgents: agents.filter((agent) => agent.archived).length,
       error: input.agentsError,
     },

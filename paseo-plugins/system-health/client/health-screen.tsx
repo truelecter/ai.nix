@@ -315,6 +315,7 @@ export function HealthScreen({ theme, layout }: PluginScreenProps) {
     const name = session.title ?? (session.agentId ? session.agentId : "No Paseo agent");
     const details = [
       session.archived ? "archived" : session.status,
+      session.background ? "background agent" : null,
       idleFor === null || session.status === "running" ? null : `idle ${formatDuration(idleFor)}`,
       `up ${formatDuration(session.ageSeconds)}`,
       session.ompVersion ? `omp ${session.ompVersion}` : null,
@@ -387,7 +388,8 @@ export function HealthScreen({ theme, layout }: PluginScreenProps) {
           <Text style={styles.text}>{formatBytes(total)}</Text>
         </View>
         <Text style={styles.muted}>
-          {a.sessions.length} omp sessions running; Paseo has {a.liveAgents} agents, {a.archivedAgents} archived.
+          {a.sessions.length} omp sessions running; Paseo has {a.liveAgents} agents
+          {a.backgroundAgents ? ` (${a.backgroundAgents} background)` : ""}, {a.archivedAgents} archived.
           {a.installedOmpVersion ? ` Installed omp ${a.installedOmpVersion}.` : ""}
           {outdated ? <Text style={{ color: c.statusDanger }}> {outdated} on an old binary.</Text> : null}
           {unmatched ? <Text style={{ color: c.statusWarning }}> {unmatched} without a live agent.</Text> : null}

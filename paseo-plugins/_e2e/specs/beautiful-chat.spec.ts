@@ -64,12 +64,8 @@ test("the Combine tool calls setting draws each call as its own row when off", a
   await finishTurn(workspace.client, agentId);
 
   await openApp(page, `/settings/hosts/${env.serverId}/plugins`);
-  await page
-    .getByRole("button", { name: "Actions for beautiful-chat", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Chat presentation", exact: true })
-    .click();
+  // The row opens the plugin's page, which shows its first settings screen inline.
+  await page.getByTestId("plugin-row-beautiful-chat").click();
   const toggle = page.getByRole("switch", { name: "Combine tool calls" });
   await expect(toggle).toBeChecked();
   await toggle.click();
@@ -114,12 +110,7 @@ test("cards show their time, and the Show times setting hides it", async ({
   await expect(timedCards.first()).toBeVisible();
 
   await openApp(page, `/settings/hosts/${env.serverId}/plugins`);
-  await page
-    .getByRole("button", { name: "Actions for beautiful-chat", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Chat presentation", exact: true })
-    .click();
+  await page.getByTestId("plugin-row-beautiful-chat").click();
   const toggle = page.getByRole("switch", { name: "Show times" });
   await expect(toggle).toBeChecked();
   await toggle.click();

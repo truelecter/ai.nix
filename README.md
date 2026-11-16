@@ -2,6 +2,8 @@
 
 Nix packages and Home Manager modules for agent tooling: [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) with its extensions and GSD, [Paseo](https://github.com/getpaseo/paseo) with its plugins, and a local SearXNG for OMP's web search.
 
+For 0.16, select **Project groups** in Settings > Sidebar > Sidebar view. The native sidebar view replaces DOM rearrangement, preserves nested assignments through migration, and keeps move controls in a separate Edit mode. `header-tab-name` handles compact workspace panes, and `system-health` includes hidden background helpers in its agent accounting. Existing width and chat-rendering plugins remain enabled; their behavior is not replaced by this migration.
+
 ## What's in it
 
 | Path                          | What it is                                                                                                                  |

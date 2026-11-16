@@ -73,7 +73,8 @@ export const test = base.extend<
  * misses it, the app shows its onboarding screen instead, and a reload probes again.
  */
 export async function openApp(page: Page, route = "/"): Promise<void> {
-  const sidebar = page.getByTestId("sidebar-project-workspace-list-scroll");
+  const sidebar = page.getByTestId("sidebar-project-workspace-list-scroll")
+    .or(page.getByTestId("plugin-sidebar-view"));
   const onboarding = page.getByText("Connect your computer to get started", {
     exact: true,
   });

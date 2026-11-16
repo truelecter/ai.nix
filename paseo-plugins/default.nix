@@ -29,7 +29,7 @@
   # plugin that has any. After changing a package.json or bun.lock, set the entry to `lib.fakeHash`,
   # build, and copy the hash from the error.
   nodeModulesHashes = {
-    _test-deps = "sha256-8yqzA4Kh808nBjwtX+vU3HmnZntzsFFpA/OZl/rR6Lg=";
+    _test-deps = "sha256-YnihTMJCPRm7Vrhm/n3RZIfwu+ENioFwsdWRCxb5KbE=";
     beautiful-chat = "sha256-3SeL5sqPpd/aabrdeU5GjYaqDYdy7vCE2fs4ddKXci4=";
   };
 
@@ -57,12 +57,11 @@
     "zod"
   ];
 
-  # The Hermes compiler of the React Native in Paseo's mobile app (packages/app/package.json in the
-  # pinned Paseo). The app runs plugin client bundles through Hermes `eval`, and Paseo doesn't
-  # lower syntax Hermes can't parse (a `class`, for one), so one such line disables the whole
-  # plugin on the phone. React Native ships the binary for macOS and x86_64 Linux only.
+  # React Native 0.86.3 uses this hermes-compiler package. Parse the lowered client bundle
+  # with the same engine family used by Paseo's mobile app, not the older RN 0.81 parser.
+  # The package ships macOS and x86_64 Linux binaries only.
   hermesc = let
-    version = "0.81.5";
+    version = "250829098.0.17";
     bin =
       if stdenvNoCC.hostPlatform.isDarwin
       then "osx-bin"
@@ -77,10 +76,10 @@
         pname = "hermesc";
         inherit version;
         src = fetchurl {
-          url = "https://registry.npmjs.org/react-native/-/react-native-${version}.tgz";
-          hash = "sha256-4xchZUdk0coEC93cXWNDN2zveZ9lEVCYuiUDQK9+GLI=";
+          url = "https://registry.npmjs.org/hermes-compiler/-/hermes-compiler-${version}.tgz";
+          hash = "sha256-UX8qSIEpMfif5uboq0srczUmnLUC9BzWXW05ZwP2B1c=";
         };
-        sourceRoot = "package/sdks/hermesc/${bin}";
+        sourceRoot = "package/hermesc/${bin}";
         dontConfigure = true;
         dontBuild = true;
         installPhase = ''

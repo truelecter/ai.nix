@@ -119,11 +119,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794312442,
-        "narHash": "sha256-IQtCkikJ9QoB+8/TgIX+AP2eM4WMz5Xra77KPbGHPDw=",
+        "lastModified": 1794832296,
+        "narHash": "sha256-lefC7MBINOwZW0hEKNbWs2WRP06zQL++2eHR+a93yVg=",
         "owner": "truelecter",
         "repo": "paseo",
-        "rev": "f94b816e890d27cd6b7716baef2c0418ae0546f2",
+        "rev": "606830fbf4a2a3396a2bb84159cf76931002821b",
         "type": "github"
       },
       "original": {

@@ -1,10 +1,10 @@
 // Pure grouping model: where each sidebar project goes, and how group edits rewrite assignments.
-// No DOM here, so it runs under node --test.
+// No React or SDK runtime here, so it runs under `bun test`.
 
 export type Assignments = Readonly<Record<string, string>>;
 
 export interface SidebarProject {
-  /** Paseo's project view key, from `data-testid="sidebar-project-row-<key>"`. */
+  /** The SDK's cross-host project ref key. */
   key: string;
   /** Name as Paseo shows it, custom name included. */
   name: string;

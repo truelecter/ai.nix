@@ -27,6 +27,8 @@ const context = {
     provider: "omp",
     cwd: "/projects/shop",
     title: null,
+    background: false,
+    metadata: {},
   },
   // The tools never use the SDK.
   paseo: {} as AgentToolContext["paseo"],

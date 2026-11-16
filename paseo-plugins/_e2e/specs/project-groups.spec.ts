@@ -1,64 +1,143 @@
-import { existsSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { env } from "../support/env";
+import { workspaceRoute } from "../support/paseo";
 import { expect, openApp, test } from "../support/fixtures";
 
-// The plugin adds group header rows (`.pg-header[data-pg-group]`) to the sidebar's project list,
-// nests grouped projects under them (`data-pg-depth` on the project's sortable item), and adds a
-// "Move to group" button (`.pg-assign`) to each project row.
-test("a project moved to a group with the folder button is nested under the group header", async ({
+// The plugin is a sidebar view ("project-groups/groups"). Paseo keeps the selected view in the
+// app's storage under `sidebar.view`, so each page selects it before the app starts. Rows carry
+// test IDs with the SDK's cross-host ref keys (`JSON.stringify([serverId, id])`).
+
+const settingsFile = path.join(env.home, "plugin-settings", "project-groups", "groups.json");
+
+function refKey(id: string): string {
+  return JSON.stringify([env.serverId, id]);
+}
+
+function stored(): {
+  version: number;
+  values: { projects?: Record<string, string>; [key: string]: unknown };
+} | null {
+  try {
+    return JSON.parse(readFileSync(settingsFile, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function openGroups(page: Page): Promise<void> {
+  await page.addInitScript(() => localStorage.setItem("sidebar.view", "project-groups/groups"));
+  await openApp(page);
+  await expect(page.getByTestId("project-groups-view")).toBeVisible({ timeout: 30_000 });
+  // The host's group document has loaded once the notice is gone.
+  await expect(page.getByTestId("project-groups-loading")).toHaveCount(0, { timeout: 30_000 });
+}
+
+test("a project moved to a group in edit mode is nested under the group row", async ({
   page,
   seed,
 }) => {
   const workspace = await seed("project-groups");
-  await openApp(page);
+  await openGroups(page);
 
-  const row = page.getByTestId(`sidebar-project-row-${workspace.projectKey}`);
-  await row.hover();
-  await row.locator(".pg-assign").click();
-  const input = page.locator(".pg-popover .pg-pop-input");
+  const row = page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}`);
+  await expect(row).toBeVisible();
+  // Normal mode shows no order or group controls.
+  await expect(page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-up`)).toHaveCount(0);
+
+  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-assign`).click();
+  const input = page.getByTestId("project-groups-input");
   await input.fill("E2E group");
   await input.press("Enter");
 
-  const header = page.locator('.pg-header[data-pg-group="E2E group"]');
-  await expect(header.locator(".pg-name")).toHaveText("E2E group");
+  const header = page.getByTestId("project-groups-group-E2E group");
   await expect(header).toHaveAttribute("aria-label", "E2E group, 1 project");
-  await expect(
-    page.locator('[data-pg-depth="1"]').filter({ has: row }),
-  ).toHaveCount(1);
+  await page.getByTestId("project-groups-edit").click();
 
-  // Assignments are host settings on the daemon, so they survive a reload.
-  const file = path.join(
-    env.home,
-    "plugin-settings",
-    "project-groups",
-    "groups.json",
-  );
-  const stored = () => (existsSync(file) ? readFileSync(file, "utf8") : "");
-  await expect.poll(stored).toContain(JSON.stringify(workspace.projectKey));
-  expect(stored()).toContain('"E2E group"');
+  // Assignments are host settings on the daemon, keyed by this host's project ID.
+  await expect.poll(() => stored()?.values.projects?.[workspace.projectId]).toBe("E2E group");
   await page.reload();
+  await expect(page.getByTestId("project-groups-view")).toBeVisible({ timeout: 30_000 });
   await expect(header).toHaveAttribute("aria-expanded", "true");
 
   await header.click();
   await expect(header).toHaveAttribute("aria-expanded", "false");
-  await expect(row).toBeHidden();
+  await expect(row).toHaveCount(0);
   await header.click();
   await expect(row).toBeVisible();
+
+  await page.getByTestId(`project-groups-workspace-${refKey(workspace.workspaceId)}`).click();
+  await expect(page).toHaveURL((url) => url.pathname === workspaceRoute(workspace.workspaceId));
 });
 
-test("a project named `group/name` is grouped by its name", async ({
-  page,
-  seed,
-  client,
-}) => {
+test("a project named `group/name` is grouped by its name", async ({ page, seed, client }) => {
   const workspace = await seed("project-groups-named");
   await client.renameProject(workspace.projectId, "Named group/app");
-  await openApp(page);
+  await openGroups(page);
 
-  const row = page.getByTestId(`sidebar-project-row-${workspace.projectKey}`);
+  await expect(page.getByTestId("project-groups-group-Named group")).toBeVisible();
   await expect(
-    page.locator('.pg-header[data-pg-group="Named group"] .pg-name'),
-  ).toHaveText("Named group");
-  await expect(row.locator("[data-pg-label]")).toHaveText("app");
+    page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-label`),
+  ).toHaveText("app");
+});
+
+test("Paseo 0.15 assignments move to their projects", async ({ page, seed }) => {
+  const shared = await seed("project-groups-legacy-shared");
+  const placed = await seed("project-groups-legacy-placed");
+  mkdirSync(path.dirname(settingsFile), { recursive: true });
+  writeFileSync(
+    settingsFile,
+    JSON.stringify({
+      version: 1,
+      values: {
+        assignments: {
+          [shared.projectKey]: "Legacy/shared",
+          [refKey(placed.projectId)]: "Legacy",
+        },
+      },
+    }),
+  );
+  await openGroups(page);
+
+  await expect(page.getByTestId("project-groups-group-Legacy")).toBeVisible();
+  await expect(page.getByTestId("project-groups-group-Legacy/shared")).toBeVisible();
+  // The placement key moves to its project; the shared project key is copied and kept, so a
+  // host listed later still gets it.
+  await expect
+    .poll(() => {
+      const file = stored();
+      return file && { version: file.version, ...file.values };
+    })
+    .toEqual({
+      version: 2,
+      projects: { [shared.projectId]: "Legacy/shared", [placed.projectId]: "Legacy" },
+      remote: {},
+      legacy: { [shared.projectKey]: "Legacy/shared" },
+      appliedLegacy: [shared.projectKey],
+    });
+});
+
+test("edit mode reorders projects and the order survives a reload", async ({ page, seed }) => {
+  const first = await seed("project-groups-order-a");
+  const second = await seed("project-groups-order-b");
+  await openGroups(page);
+
+  const firstRow = page.getByTestId(`project-groups-project-${refKey(first.projectId)}`);
+  const secondRow = page.getByTestId(`project-groups-project-${refKey(second.projectId)}`);
+  const above = async () =>
+    ((await firstRow.boundingBox())?.y ?? 0) < ((await secondRow.boundingBox())?.y ?? 0);
+  await expect.poll(above).toBe(true);
+
+  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId(`project-groups-project-${refKey(second.projectId)}-up`).click();
+  await expect.poll(above).toBe(false);
+  await page.getByTestId("project-groups-edit").click();
+  await expect(page.getByTestId(`project-groups-project-${refKey(second.projectId)}-up`)).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByTestId("project-groups-view")).toBeVisible({ timeout: 30_000 });
+  await expect(secondRow).toBeVisible();
+  await expect.poll(above).toBe(false);
 });

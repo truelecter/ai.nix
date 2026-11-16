@@ -32,8 +32,7 @@ Android it does nothing; phones are narrower than 820 px anyway.
 
 ## Settings
 
-**Settings → Plugins → wide-chat → Chat width**, or **Chat width settings** in the Command Center
-(⌘K):
+In Paseo 0.16, open **Settings > Plugins**, then the **Settings** cog on the `wide-chat` row, or use **Chat width settings** in the Command Center (Cmd+K):
 
 | Setting       | Default         | Choices      |
 | ------------- | --------------- | ------------ |
@@ -46,11 +45,8 @@ focus.
 
 ## Limits
 
-- It depends on Paseo's 820 px value. If Paseo changes it, update `STOCK_MAX_WIDTH` in
-  `client/css.ts`.
-- Paseo estimates message heights for its virtualized list from 820 px. Wider rows are shorter
-  than estimated, so the first scroll through a long history can shift a little while real
-  heights replace the estimates.
+- It depends on Paseo's 820 px value (`DEFAULT_CONTENT_MAX_WIDTH`, unchanged through Paseo 0.16, which also has no plugin API for the content width). If Paseo changes it, update `STOCK_MAX_WIDTH` in `client/css.ts`.
+- Paseo estimates message heights for its virtualized list from 820 px. Wider rows are shorter than estimated, so the first scroll through a long history can shift a little while real heights replace the estimates.
 
 ## Develop
 

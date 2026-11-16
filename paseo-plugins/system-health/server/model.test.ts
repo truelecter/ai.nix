@@ -181,6 +181,7 @@ test("sessions match Paseo agents by session id, from --session or the open sess
       title: "Fix login",
       status: "idle",
       archived: false,
+      background: true,
       cwd: "/p",
       sessionId: SESSION_A,
       lastActivityAt: "2026-10-05T23:00:00Z",
@@ -190,6 +191,7 @@ test("sessions match Paseo agents by session id, from --session or the open sess
       title: "Old chat",
       status: "closed",
       archived: true,
+      background: false,
       cwd: "/q",
       sessionId: SESSION_B,
       lastActivityAt: null,
@@ -199,6 +201,7 @@ test("sessions match Paseo agents by session id, from --session or the open sess
       title: "Not running",
       status: "idle",
       archived: false,
+      background: false,
       cwd: "/r",
       sessionId: "other",
       lastActivityAt: null,
@@ -252,10 +255,12 @@ test("sessions match Paseo agents by session id, from --session or the open sess
   const [old, live, unknown] = snapshot.agents.sessions;
   assert.equal(old?.agentId, "agent-b");
   assert.equal(old?.archived, true);
+  assert.equal(old?.background, false);
   assert.equal(old?.ompVersion, "18.3.2");
   assert.equal(old?.outdated, true);
   assert.equal(live?.agentId, "agent-a");
   assert.equal(live?.title, "Fix login");
+  assert.equal(live?.background, true);
   assert.equal(live?.outdated, false);
   assert.equal(live?.memBytes, 190 * MB);
   assert.equal(live?.compressedBytes, 30 * MB);
@@ -266,6 +271,7 @@ test("sessions match Paseo agents by session id, from --session or the open sess
   // A subagent's file under a session folder is not the session's own file.
   assert.equal(unknown?.agentId, null);
   assert.equal(snapshot.agents.liveAgents, 2);
+  assert.equal(snapshot.agents.backgroundAgents, 1);
   assert.equal(snapshot.agents.archivedAgents, 1);
 });
 

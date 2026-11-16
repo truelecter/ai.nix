@@ -1,38 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { Assignments } from "./groups.ts";
-import {
-  createAssignmentSync,
-  type SettingsRead,
-  type SettingsWrite,
-} from "./sync.ts";
+import { createDocumentSync, type SettingsRead, type SettingsWrite } from "./sync.ts";
 
-function fakeDaemon(initial: Assignments) {
+type Doc = Record<string, string>;
+
+function fakeDaemon(initial: Doc) {
   let revision = 1;
-  let values: Assignments = initial;
+  let values: Doc = initial;
+  let invalid: string | null = null;
   const writes: string[] = [];
   return {
     writes,
     /** Someone else saves in between. */
-    externalWrite(next: Assignments) {
+    externalWrite(next: Doc) {
       values = next;
       revision += 1;
     },
-    async read(): Promise<SettingsRead> {
-      return {
-        status: "ready",
-        revision: String(revision),
-        values: { assignments: values },
-      };
+    corrupt(error: string) {
+      invalid = error;
     },
-    async write(
-      rev: string,
-      next: { assignments: Record<string, string> },
-    ): Promise<SettingsWrite> {
+    async read(): Promise<SettingsRead> {
+      if (invalid) return { status: "invalid", revision: String(revision), error: invalid };
+      return { status: "ready", revision: String(revision), values };
+    },
+    async write(rev: string, next: Doc): Promise<SettingsWrite> {
       writes.push(rev);
-      if (rev !== String(revision))
-        return { status: "conflict", error: "stale" };
-      values = next.assignments;
+      if (rev !== String(revision)) return { status: "conflict", error: "stale" };
+      values = next;
       revision += 1;
       return { status: "saved", revision: String(revision), values: next };
     },
@@ -40,25 +34,27 @@ function fakeDaemon(initial: Assignments) {
   };
 }
 
-function setup(initial: Assignments) {
+function setup(initial: Doc) {
   const daemon = fakeDaemon(initial);
-  const seen: Assignments[] = [];
+  const seen: Doc[] = [];
   const errors: unknown[] = [];
-  const sync = createAssignmentSync({
+  const sync = createDocumentSync<Doc>({
     read: daemon.read,
     write: daemon.write,
-    parse: (values) => (values as { assignments: Assignments }).assignments,
-    onChange: (assignments) => seen.push(assignments),
+    parse: (values) => values as Doc,
+    empty: {},
+    onChange: (doc) => seen.push(doc),
     onError: (error) => errors.push(error),
   });
   return { daemon, sync, seen, errors };
 }
 
-describe("createAssignmentSync", () => {
+describe("createDocumentSync", () => {
   it("loads, shows a change at once, then saves it", async () => {
     const { daemon, sync, seen } = setup({ a: "x" });
     await sync.refresh();
     assert.deepEqual(seen.at(-1), { a: "x" });
+    assert.equal(sync.status().status, "ready");
 
     const saved = sync.update((current) => ({ ...current, b: "y" }));
     assert.deepEqual(seen.at(-1), { a: "x", b: "y" });
@@ -88,25 +84,21 @@ describe("createAssignmentSync", () => {
     assert.deepEqual(daemon.stored(), { a: "2", b: "2" });
   });
 
-  it("reverts to the stored values when saving fails", async () => {
-    const { sync, seen, errors } = setup({ a: "x" });
-    await sync.refresh();
-    const failing = createAssignmentSync({
-      read: async () => ({
-        status: "ready",
-        revision: "1",
-        values: { assignments: { a: "x" } },
-      }),
+  it("reverts to the stored values and rejects when saving fails", async () => {
+    const errors: unknown[] = [];
+    const failing = createDocumentSync<Doc>({
+      read: async () => ({ status: "ready", revision: "1", values: { a: "x" } }),
       write: async () => ({ status: "invalid", error: "nope" }),
-      parse: (values) => (values as { assignments: Assignments }).assignments,
-      onChange: (assignments) => seen.push(assignments),
+      parse: (values) => values as Doc,
+      empty: {},
+      onChange: () => {},
       onError: (error) => errors.push(error),
     });
     await failing.refresh();
-    await failing.update(() => ({ a: "broken" }));
+    await assert.rejects(failing.update(() => ({ a: "broken" })), /nope/);
+    await Promise.resolve();
     assert.equal(errors.length, 1);
     assert.deepEqual(failing.current(), { a: "x" });
-    assert.deepEqual(sync.current(), { a: "x" });
   });
 
   it("does not let a refresh drop a change that is still saving", async () => {
@@ -117,5 +109,54 @@ describe("createAssignmentSync", () => {
     assert.deepEqual(seen.at(-1), { a: "1" });
     await saving;
     assert.deepEqual(sync.current(), { a: "1" });
+  });
+
+  it("never overwrites an invalid stored document", async () => {
+    const { daemon, sync } = setup({ a: "x" });
+    daemon.corrupt("bad schema");
+    await sync.refresh();
+    assert.deepEqual(sync.status(), { status: "invalid", error: "bad schema" });
+    await assert.rejects(sync.update(() => ({ b: "y" })), /bad schema/);
+    assert.deepEqual(daemon.writes, []);
+    assert.deepEqual(daemon.stored(), { a: "x" });
+  });
+
+  it("never lets a read that started before a save replace it", async () => {
+    const daemon = fakeDaemon({ a: "x" });
+    let releaseRead: () => void = () => {};
+    let markParked: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (markParked = resolve));
+    let deferred = false;
+    const sync = createDocumentSync<Doc>({
+      read: async () => {
+        const snapshot = await daemon.read();
+        if (deferred) {
+          const release = new Promise<void>((resolve) => (releaseRead = resolve));
+          markParked();
+          await release;
+        }
+        return snapshot;
+      },
+      write: daemon.write,
+      parse: (values) => values as Doc,
+      empty: {},
+      onChange: () => {},
+      onError: () => {},
+    });
+    await sync.refresh();
+    deferred = true;
+    const reading = sync.refresh();
+    const saving = sync.update((current) => ({ ...current, b: "y" }));
+    // The read is parked; the save must wait behind it.
+    await parked;
+    assert.deepEqual(daemon.writes, []);
+    deferred = false;
+    releaseRead();
+    await Promise.all([reading, saving]);
+    assert.deepEqual(daemon.writes, ["1"]);
+    assert.deepEqual(daemon.stored(), { a: "x", b: "y" });
+    assert.deepEqual(sync.current(), { a: "x", b: "y" });
+    await sync.refresh();
+    assert.deepEqual(sync.current(), { a: "x", b: "y" });
   });
 });

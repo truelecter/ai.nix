@@ -20,8 +20,10 @@ async function listAgents({
   const agents: AgentInfo[] = [];
   let cursor: string | undefined;
   do {
+    // Background agents (helpers hidden from tabs and lists) run omp sessions too; without them
+    // their sessions would show as having no Paseo agent and be offered for a kill.
     const page = await paseo.agents.list({
-      filter: { includeArchived: true },
+      filter: { includeArchived: true, includeBackground: true },
       page: { limit: 200, cursor },
     });
     for (const { agent } of page.entries) {
@@ -30,6 +32,7 @@ async function listAgents({
         title: agent.title,
         status: agent.status,
         archived: !!agent.archivedAt,
+        background: agent.background === true,
         cwd: agent.cwd,
         sessionId:
           agent.runtimeInfo?.sessionId ?? agent.persistence?.sessionId ?? null,

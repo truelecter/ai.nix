@@ -6,6 +6,11 @@
 //   tabs row (`workspace-tabs-row`). Its selected chips (`aria-selected="true"`) are one per pane.
 //   The Explorer sidebar (`workspace-explorer-sidebar`) draws the same tabs row since Paseo 0.11;
 //   its chips are skipped, so its Files or Changes tab never names the header.
+// - A title inside a pane (`workspace-pane-<id>`) belongs to that pane alone. Since Paseo 0.16 a
+//   pane narrower than 500px (a single pane in a narrow desktop window) swaps its full header and
+//   tabs row for the compact header, whose title then sits in a pane without a tabs row: the open
+//   tab is in its tab switcher, so the compact header gets no name, and the search never climbs
+//   past the pane to another workspace's or the Explorer's tabs.
 // - The focused pane's chip is the one filled with `surface2`; Paseo gives the selected chip of an
 //   unfocused pane `surface1`. A hidden probe resolves the theme variable to compare against.
 // - The name goes into a node of ours appended to the title's flex row. React tolerates extra
@@ -67,6 +72,7 @@ const TITLE = '[data-testid="workspace-header-title"]';
 const TABS_ROW = '[data-testid="workspace-tabs-row"]';
 const SELECTED_TAB = `${TABS_ROW} [data-testid^="workspace-tab-"][aria-selected="true"]`;
 const EXPLORER = '[data-testid="workspace-explorer-sidebar"]';
+const PANE = '[data-testid^="workspace-pane-"]';
 const SEPARATOR = "\u203a";
 
 // The row is Paseo's title group: a flex row on wide layouts with an 8px gap. Only wide layouts
@@ -91,8 +97,13 @@ function setText(node: El, text: string) {
   if (node.textContent !== text) node.textContent = text;
 }
 
-/** The closest ancestor of the title that also holds the screen's tabs row. */
+/**
+ * The element holding the title's tabs: its own pane, or above a split the closest ancestor that
+ * also holds a tabs row. Null for a compact pane header, whose pane has no tabs row.
+ */
 function screenOf(title: El): El | null {
+  const pane = title.closest(PANE);
+  if (pane) return pane.querySelector(TABS_ROW) ? pane : null;
   for (let node = title.parentElement; node; node = node.parentElement) {
     if (node.querySelector(TABS_ROW)) return node;
   }

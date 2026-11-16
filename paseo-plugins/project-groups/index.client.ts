@@ -1,41 +1,18 @@
-import { settingsRpc } from "@getpaseo/plugin";
 import type { PluginClientContext } from "@getpaseo/plugin/client";
-import { createAssignmentSync } from "./client/sync.ts";
-import {
-  onWindowFocus,
-  startSidebarGroups,
-  type SidebarGroups,
-} from "./client/web.ts";
-import { groupSettings } from "./shared/settings.ts";
+import { startHostGroups } from "./client/registry.ts";
+import { GroupsView } from "./client/view.tsx";
 
 export default function contribute(client: PluginClientContext) {
-  const rpc = settingsRpc(groupSettings.id);
-  let sidebar: SidebarGroups | null = null;
-
-  const sync = createAssignmentSync({
-    read: () => client.rpc(rpc.read, {}),
-    write: (revision, values) => client.rpc(rpc.write, { revision, values }),
-    parse: (values) => {
-      const parsed = groupSettings.schema.safeParse(values);
-      return parsed.success ? parsed.data.assignments : {};
-    },
-    onChange: (assignments) => sidebar?.setAssignments(assignments),
-    onError: (error) =>
-      console.warn("[project-groups] Could not sync groups", error),
+  // Runs once per connected host: each publishes its host's groups for the one rendered view.
+  const stopHost = startHostGroups(client);
+  const removeView = client.addSidebarView({
+    id: "groups",
+    title: "Project groups",
+    description: "Projects nested in collapsible groups, with pinned workspaces on top.",
+    Component: GroupsView,
   });
-
-  sidebar = startSidebarGroups({
-    update: (change) => void sync.update(change),
-  });
-  if (!sidebar) return () => {};
-
-  void sync.refresh();
-  // Another window or device may have regrouped projects meanwhile.
-  const stopFocus = onWindowFocus(() => void sync.refresh());
-
   return () => {
-    stopFocus();
-    sidebar?.stop();
-    sidebar = null;
+    void removeView();
+    stopHost();
   };
 }

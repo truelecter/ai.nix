@@ -1,7 +1,7 @@
 {
   "name": "project-groups",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "files": [
     "paseo-plugin.json",
@@ -15,11 +15,13 @@
     "test": "bun test client/*.test.ts"
   },
   "devDependencies": {
-    "@getpaseo/plugin": "0.10.0",
+    "@getpaseo/client": "0.16.0",
+    "@getpaseo/plugin": "0.16.0",
+    "@getpaseo/protocol": "0.16.0",
     "@types/node": "^22.10.0",
     "@types/react": "~19.2.0",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
     "typescript": "^5.9.3",
     "zod": "^4.4.3"
   }

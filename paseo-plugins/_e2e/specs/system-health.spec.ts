@@ -1,11 +1,36 @@
 import { expect, openApp, test } from "../support/fixtures";
-import { createMockAgent } from "../support/paseo";
+import { type Client, createMockAgent } from "../support/paseo";
+
+/** Every agent the daemon has, archived and background ones included, as the plugin reads them. */
+async function countAgents(client: Client) {
+  let live = 0;
+  let background = 0;
+  let archived = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await client.fetchAgents({
+      filter: { includeArchived: true, includeBackground: true },
+      page: { limit: 200, cursor },
+    });
+    for (const { agent } of page.entries) {
+      if (agent.archivedAt) archived++;
+      else {
+        live++;
+        if (agent.background) background++;
+      }
+    }
+    cursor = page.pageInfo.hasMore
+      ? (page.pageInfo.nextCursor ?? undefined)
+      : undefined;
+  } while (cursor);
+  return { live, background, archived };
+}
 
 // The plugin samples macOS tools (top, vm_stat, lsof); its package exists only on Darwin, so the
 // harness loads it only there.
 test.skip(process.platform !== "darwin", "system-health is macOS only");
 
-test("the System health screen samples this Mac, counts the daemon's agents, and keeps the refresh interval", async ({
+test("the System health screen samples this Mac, counts the daemon's agents with background ones, and keeps the refresh interval", async ({
   page,
   seed,
 }) => {
@@ -14,6 +39,23 @@ test("the System health screen samples this Mac, counts the daemon's agents, and
     title: "Health check agent",
     initialPrompt: "hello",
   });
+  // A background agent: hidden from Paseo's default agent list, still a running session.
+  const helper = await workspace.client.createAgent({
+    provider: "mock",
+    cwd: workspace.repoPath,
+    workspaceId: workspace.workspaceId,
+    title: "Health check background helper",
+    modeId: "load-test",
+    model: "e2e-fast-stream",
+    background: true,
+  });
+  const visible = await workspace.client.fetchAgents({
+    filter: { includeArchived: true },
+    page: { limit: 200 },
+  });
+  expect(visible.entries.map(({ agent }) => agent.id)).not.toContain(helper.id);
+  const counts = await countAgents(workspace.client);
+  expect(counts.background).toBeGreaterThan(0);
 
   await openApp(page);
   await page.getByTestId("plugin-sidebar-system-health-system-health").click();
@@ -25,7 +67,7 @@ test("the System health screen samples this Mac, counts the daemon's agents, and
     /\d+(\.\d)? (MB|GB)/,
   );
   await expect(page.getByTestId("system-health-agents")).toContainText(
-    /Paseo has [1-9]\d* agents/,
+    `Paseo has ${counts.live} agents (${counts.background} background), ${counts.archived} archived.`,
   );
 
   const tenSeconds = page.getByLabel("Refresh every 10 seconds");

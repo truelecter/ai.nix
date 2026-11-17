@@ -23,12 +23,13 @@ A right-click (long press on touch) opens the same menu as `⋮`, a dropdown at 
 
 Text and row sizes follow Paseo's sidebar at its default UI font size: 14pt text and 36pt rows on the desktop and web, 15pt text and 44pt rows on touch layouts. The plugin theme carries colors only, so a custom **Interface font size** in Paseo's Appearance settings doesn't reach the view, and the status colors are Paseo's, picked by the theme's lightness.
 
-Each section header has a pencil that turns that section's edit mode on (a check mark turns it off; edit mode itself is not saved). Workspace actions stay in the row menus.
+Each section has its own edit mode (a check mark in the header turns it off; edit mode itself is not saved). The **Pinned** header turns it on with its pencil; the **Projects** header has Paseo's display preferences button, whose menu holds **Sort** and **Edit groups and order**. Workspace actions stay in the row menus.
 
+- Sort (saved on this device): **Manual** (the order set in edit mode, then by title), **Created** (newest first), or **Last prompt** (newest first, a workspace with no prompt yet by its creation), as Paseo's own Sort. It orders each project's workspaces; pinned workspaces keep their own order.
 - Pinned: move up and move down buttons on every pinned workspace. A newly pinned workspace, or one pinned again, goes on top.
 - Projects, on a project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`) and **Remove from group**.
 - Projects, on a group: **Rename** (also moves subgroups; type a path with `/` to move it under another group) and **Ungroup** (removes one level: projects move to the parent group, or out of groups at the top level). Both also apply to projects grouped only by their name.
-- Projects, order: every project, group, and workspace row has move up and move down buttons. A group moves with everything in it.
+- Projects, order: every project and group row has move up and move down buttons, and so does every workspace row while the sort is **Manual**. A group moves with everything in it.
 
 A project's group comes from, in order:
 

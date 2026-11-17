@@ -124,3 +124,15 @@ export function moveItem(keys: readonly string[], key: string, direction: -1 | 1
   [next[index], next[target]] = [next[target], next[index]];
   return next;
 }
+
+/**
+ * A workspace's time for Paseo's automatic sorts, newest first: when it was created, or its last
+ * prompt (its creation when it has none yet). 0 when unknown, so those sort last.
+ */
+export function workspaceSortTime(
+  item: { createdAt: string | null; lastPromptAt: string | null },
+  sort: "created" | "lastPrompt",
+): number {
+  const time = sort === "lastPrompt" ? (item.lastPromptAt ?? item.createdAt) : item.createdAt;
+  return (time && Date.parse(time)) || 0;
+}

@@ -34,6 +34,12 @@ async function openGroups(page: Page): Promise<void> {
   await expect(page.getByTestId("project-groups-loading")).toHaveCount(0, { timeout: 30_000 });
 }
 
+/** Opens the Projects header's display menu and turns on its edit mode. */
+async function editGroups(page: Page): Promise<void> {
+  await page.getByTestId("project-groups-projects-header-menu").click();
+  await page.getByTestId("project-groups-projects-header-edit").click();
+}
+
 test("a project moved to a group in edit mode is nested under the group row", async ({
   page,
   seed,
@@ -46,7 +52,7 @@ test("a project moved to a group in edit mode is nested under the group row", as
   // Normal mode shows no order or group controls.
   await expect(page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-up`)).toHaveCount(0);
 
-  await page.getByTestId("project-groups-projects-header-edit").click();
+  await editGroups(page);
   await page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-assign`).click();
   const input = page.getByTestId("project-groups-input");
   await input.fill("E2E group");
@@ -130,7 +136,7 @@ test("edit mode reorders projects and the order survives a reload", async ({ pag
     ((await firstRow.boundingBox())?.y ?? 0) < ((await secondRow.boundingBox())?.y ?? 0);
   await expect.poll(above).toBe(true);
 
-  await page.getByTestId("project-groups-projects-header-edit").click();
+  await editGroups(page);
   await page.getByTestId(`project-groups-project-${refKey(second.projectId)}-up`).click();
   await expect.poll(above).toBe(false);
   await page.getByTestId("project-groups-projects-header-edit").click();
@@ -187,6 +193,52 @@ test("pinned workspaces reorder in edit mode, and a new pin goes on top", async 
   await client.setWorkspacePinned(second.workspaceId, false);
   await client.setWorkspacePinned(second.workspaceId, true);
   await expect.poll(order).toEqual(keys(second, third, first));
+});
+
+test("the display menu sorts a project's workspaces by creation, and back to manual", async ({
+  page,
+  seed,
+  client,
+}) => {
+  const first = await seed("project-groups-sort");
+  const created = await client.createWorkspace({
+    source: {
+      kind: "worktree",
+      cwd: first.repoPath,
+      projectId: first.projectId,
+      action: "branch-off",
+      branchName: "e2e-sort",
+    },
+    title: "zzz newer",
+  });
+  const second = created.workspace;
+  if (!second) throw new Error(created.error ?? "no worktree workspace");
+  await openGroups(page);
+
+  const row = (id: string) => page.getByTestId(`project-groups-workspace-${refKey(id)}`);
+  await expect(row(second.id)).toBeVisible();
+  const newerFirst = async () =>
+    ((await row(second.id).boundingBox())?.y ?? 0) < ((await row(first.workspaceId).boundingBox())?.y ?? 0);
+  // Manual sorts by title until moved: "main" before "zzz newer".
+  await expect.poll(newerFirst).toBe(false);
+
+  await page.getByTestId("project-groups-projects-header-menu").click();
+  await expect(page.getByTestId("project-groups-sort")).toContainText("Manual");
+  await page.getByTestId("project-groups-sort").click();
+  await page.getByTestId("project-groups-sort-created").click();
+  await expect.poll(newerFirst).toBe(true);
+  // Sorted by time, edit mode has no workspace moves.
+  await editGroups(page);
+  await expect(page.getByTestId(`project-groups-workspace-${refKey(first.workspaceId)}-up`)).toHaveCount(0);
+  await page.getByTestId("project-groups-projects-header-edit").click();
+
+  await page.reload();
+  await expect(row(second.id)).toBeVisible({ timeout: 30_000 });
+  await expect.poll(newerFirst).toBe(true);
+  await page.getByTestId("project-groups-projects-header-menu").click();
+  await page.getByTestId("project-groups-sort").click();
+  await page.getByTestId("project-groups-sort-manual").click();
+  await expect.poll(newerFirst).toBe(false);
 });
 
 test("a pinned workspace archives from its row without edit mode", async ({

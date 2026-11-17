@@ -8,6 +8,7 @@ import {
   moveSibling,
   orderIndex,
   siblingMoves,
+  workspaceSortTime,
 } from "./order.ts";
 
 const projects: SidebarProject[] = [
@@ -126,5 +127,22 @@ describe("moveItem", () => {
     assert.deepEqual(moveItem(["x", "y", "z"], "z", -1), ["x", "z", "y"]);
     assert.equal(moveItem(["x", "y"], "x", -1), null);
     assert.equal(moveItem(["x"], "missing", 1), null);
+  });
+});
+
+describe("workspaceSortTime", () => {
+  const created = "2026-11-01T10:00:00.000Z";
+  const prompted = "2026-11-10T10:00:00.000Z";
+
+  it("reads the last prompt, falling back to creation before the first one", () => {
+    const both = { createdAt: created, lastPromptAt: prompted };
+    assert.equal(workspaceSortTime(both, "lastPrompt"), Date.parse(prompted));
+    assert.equal(workspaceSortTime({ createdAt: created, lastPromptAt: null }, "lastPrompt"), Date.parse(created));
+    assert.equal(workspaceSortTime(both, "created"), Date.parse(created));
+  });
+
+  it("puts unknown and unreadable times last", () => {
+    assert.equal(workspaceSortTime({ createdAt: null, lastPromptAt: null }, "lastPrompt"), 0);
+    assert.equal(workspaceSortTime({ createdAt: "soon", lastPromptAt: null }, "created"), 0);
   });
 });

@@ -79,6 +79,7 @@ import {
   moveSibling,
   orderIndex,
   siblingMoves,
+  workspaceSortTime,
 } from "./order.ts";
 import { useHostGroups, type HostGroups } from "./registry.ts";
 import { compactTimeAgo, nextTimeAgoChange } from "./time.ts";
@@ -112,6 +113,7 @@ interface Actions {
   ungroup(path: string): void;
   moveRow(id: string, direction: Direction): void;
   moveWorkspace(projectKey: string, keys: readonly string[], key: string, direction: Direction): void;
+  setWorkspaceSort(sort: LayoutPrefs["workspaceSort"]): void;
   run(work: () => Promise<unknown>, what: string): void;
 }
 
@@ -551,25 +553,20 @@ function IconButton({
 const EditingContext = createContext(false);
 
 /**
- * A section's header row, as Paseo's "Pinned" and "Workspaces": the title, and a pencil that
- * turns the section's edit mode on and off (a check mark while it is on). A sticky header paints
- * the sidebar's background behind it, read from the page on the web and estimated on native.
+ * A section's header row, as Paseo's "Pinned" and "Workspaces": the title and, at the trailing
+ * edge, its buttons. A sticky header paints the sidebar's background behind it, read from the
+ * page on the web and estimated on native.
  */
 function SectionHeader({
   title,
-  editing,
-  editLabel,
-  onToggleEditing,
   sticky = false,
   testID,
+  children,
 }: {
   title: string;
-  editing: boolean;
-  /** What the section's edit mode changes, for the pencil's label: "pinned workspaces". */
-  editLabel: string;
-  onToggleEditing(): void;
   sticky?: boolean;
   testID: string;
+  children: ReactNode;
 }) {
   const { view, styles } = useView();
   const header = useRef<View>(null);
@@ -590,26 +587,143 @@ function SectionHeader({
       <Text accessibilityRole="header" numberOfLines={1} style={styles.sectionTitle}>
         {title}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={editing ? `Done editing ${editLabel}` : `Edit ${editLabel}`}
-        accessibilityState={{ selected: editing }}
-        hitSlop={4}
-        onPress={onToggleEditing}
-        testID={`${testID}-edit`}
-        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-          styles.headerButton,
-          pressed || hovered || editing ? styles.pressed : null,
-        ]}
-      >
-        {/* Paseo's section header buttons: a 14pt glyph in a 28pt square. */}
-        <Icon
-          name={editing ? "Check" : "Pencil"}
-          size={14}
-          color={view.theme.colors.foregroundMuted}
-        />
-      </Pressable>
+      {children}
     </View>
+  );
+}
+
+/** Paseo's section header button: a 14pt glyph in a 28pt square (a touch target on touch). */
+function HeaderButton({
+  icon,
+  label,
+  onPress,
+  active = false,
+  buttonRef,
+  testID,
+}: {
+  icon: string;
+  label: string;
+  onPress(): void;
+  /** Edit mode on, or its menu open. */
+  active?: boolean;
+  buttonRef?: RefObject<View | null>;
+  testID: string;
+}) {
+  const { view, styles } = useView();
+  return (
+    <Pressable
+      ref={buttonRef}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      hitSlop={4}
+      onPress={onPress}
+      testID={testID}
+      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+        styles.headerButton,
+        pressed || hovered || active ? styles.pressed : null,
+      ]}
+    >
+      <Icon name={icon} size={14} color={view.theme.colors.foregroundMuted} />
+    </Pressable>
+  );
+}
+
+type WorkspaceSort = LayoutPrefs["workspaceSort"];
+
+const WORKSPACE_SORTS: readonly { sort: WorkspaceSort; label: string; icon: string }[] = [
+  { sort: "manual", label: "Manual", icon: "ListOrdered" },
+  { sort: "created", label: "Created", icon: "CalendarPlus" },
+  { sort: "lastPrompt", label: "Last prompt", icon: "MessageSquare" },
+];
+
+/**
+ * The Projects header's display menu, behind Paseo's sliders button: the workspace sort (a page
+ * of its own, as in Paseo's menu) and the way into edit mode. While editing, a check mark in its
+ * place leaves edit mode.
+ */
+function ProjectsHeaderActions({
+  editing,
+  onToggleEditing,
+}: {
+  editing: boolean;
+  onToggleEditing(): void;
+}) {
+  const { prefs, actions } = useView();
+  const menu = useRowMenu();
+  const [page, setPage] = useState<"root" | "sort">("root");
+  if (editing) {
+    return (
+      <HeaderButton
+        icon="Check"
+        label="Done editing groups"
+        active
+        onPress={onToggleEditing}
+        testID="project-groups-projects-header-edit"
+      />
+    );
+  }
+  const current = WORKSPACE_SORTS.find((item) => item.sort === prefs.workspaceSort);
+  const entries: MenuEntry[] =
+    page === "root"
+      ? [
+          {
+            key: "sort",
+            label: "Sort",
+            detail: current?.label,
+            icon: "ArrowDownUp",
+            keepOpen: true,
+            onSelect: () => setPage("sort"),
+            testID: "project-groups-sort",
+          },
+          "separator",
+          {
+            key: "edit",
+            label: "Edit groups and order",
+            icon: "Pencil",
+            onSelect: onToggleEditing,
+            testID: "project-groups-projects-header-edit",
+          },
+        ]
+      : [
+          {
+            key: "back",
+            label: "Sort",
+            icon: "ChevronLeft",
+            keepOpen: true,
+            onSelect: () => setPage("root"),
+          },
+          "separator",
+          ...WORKSPACE_SORTS.map(({ sort, label, icon }) => ({
+            key: sort,
+            label,
+            icon,
+            checked: prefs.workspaceSort === sort,
+            onSelect: () => actions.setWorkspaceSort(sort),
+            testID: `project-groups-sort-${sort}`,
+          })),
+        ];
+  return (
+    <>
+      <HeaderButton
+        icon="Settings2"
+        label="Display preferences"
+        active={menu.placement !== null}
+        buttonRef={menu.trigger}
+        onPress={menu.openAtTrigger}
+        testID="project-groups-projects-header-menu"
+      />
+      <ActionMenu
+        title="Display preferences"
+        menu={menu}
+        entries={entries}
+        onClose={() => {
+          menu.close();
+          setPage("root");
+        }}
+        testID="project-groups-projects-menu"
+      />
+    </>
   );
 }
 
@@ -682,6 +796,8 @@ interface MenuItem {
   label: string;
   icon: string;
   danger?: boolean;
+  /** A value after the label with a chevron, for an item that opens a page ("Sort  Manual >"). */
+  detail?: string;
   /** Shows a check after the label (a label assigned to the workspace). */
   checked?: boolean;
   /** The item swaps the menu's content instead of closing it. */
@@ -889,6 +1005,15 @@ function MenuSurface({
             <>
               <View style={styles.spacer} />
               <Icon name="Check" size={iconSize} color={view.theme.colors.foreground} />
+            </>
+          ) : null}
+          {entry.detail !== undefined ? (
+            <>
+              <View style={styles.spacer} />
+              <Text numberOfLines={1} style={styles.detail}>
+                {entry.detail}
+              </Text>
+              <Icon name="ChevronRight" size={iconSize} color={view.theme.colors.foregroundMuted} />
             </>
           ) : null}
         </Pressable>
@@ -1445,17 +1570,21 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
   const id = entryId(entry);
   const collapsed = prefs.collapsedProjects.includes(key);
   const order = prefs.workspaceOrder[key];
+  const sort = prefs.workspaceSort;
   const index = useMemo(() => orderIndex(order ?? NONE), [order]);
   const workspaces = useWorkspaces({
     where: (workspace) =>
       workspace.project.key === key && workspace.pinnedAt === null && !workspace.background,
     orderBy: (a, b) =>
-      compareOrdered(
-        index,
-        a.ref.key,
-        b.ref.key,
-        compareNames(a.title ?? a.name, b.title ?? b.name) || a.ref.key.localeCompare(b.ref.key),
-      ),
+      sort === "manual"
+        ? compareOrdered(
+            index,
+            a.ref.key,
+            b.ref.key,
+            compareNames(a.title ?? a.name, b.title ?? b.name) || a.ref.key.localeCompare(b.ref.key),
+          )
+        : workspaceSortTime(b, sort) - workspaceSortTime(a, sort) ||
+          a.ref.key.localeCompare(b.ref.key),
   });
   const workspaceKeys = useMemo(() => workspaces.map((workspace) => workspace.key), [workspaces]);
   const status = useAggregateStatus(collapsed ? [key] : NONE);
@@ -1658,7 +1787,12 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
               key={workspace.key}
               reference={workspace}
               depth={entry.depth + 1}
-              siblings={{ projectKey: key, keys: workspaceKeys, key: workspace.key }}
+              // Moving a workspace means a manual order; sorted by time, rows have no moves.
+              siblings={
+                sort === "manual"
+                  ? { projectKey: key, keys: workspaceKeys, key: workspace.key }
+                  : undefined
+              }
             />
           ))}
       {!collapsed && count === 0 ? (
@@ -1986,13 +2120,15 @@ function PinnedSection({ editing, onToggleEditing }: { editing: boolean; onToggl
   if (pinned.length === 0) return null;
   return (
     <View style={styles.pinnedSection} testID="project-groups-pinned">
-      <SectionHeader
-        title="Pinned"
-        editing={editing}
-        editLabel="pinned workspaces"
-        onToggleEditing={onToggleEditing}
-        testID="project-groups-pinned-header"
-      />
+      <SectionHeader title="Pinned" testID="project-groups-pinned-header">
+        <HeaderButton
+          icon={editing ? "Check" : "Pencil"}
+          label={editing ? "Done editing pinned workspaces" : "Edit pinned workspaces"}
+          active={editing}
+          onPress={onToggleEditing}
+          testID="project-groups-pinned-header-edit"
+        />
+      </SectionHeader>
       <EditingContext.Provider value={editing}>
         {pinned.map((reference, position) => (
           <WorkspaceRow
@@ -2172,6 +2308,9 @@ export function GroupsView(view: PluginSidebarViewProps) {
           workspaceOrder: { ...values.workspaceOrder, [projectKey]: next },
         }));
     },
+    setWorkspaceSort(sort) {
+      savePrefs((values) => ({ ...values, workspaceSort: sort }));
+    },
     run,
   };
 
@@ -2314,17 +2453,15 @@ export function GroupsView(view: PluginSidebarViewProps) {
             onToggleEditing={() => setEditingPinned((current) => !current)}
           />
         </View>
-        <SectionHeader
-          title="Projects"
-          editing={editing}
-          editLabel="groups"
-          onToggleEditing={() => {
-            close();
-            setEditing((current) => !current);
-          }}
-          sticky
-          testID="project-groups-projects-header"
-        />
+        <SectionHeader title="Projects" sticky testID="project-groups-projects-header">
+          <ProjectsHeaderActions
+            editing={editing}
+            onToggleEditing={() => {
+              close();
+              setEditing((current) => !current);
+            }}
+          />
+        </SectionHeader>
         <EditingContext.Provider value={editing}>
           {layout.map((entry) => {
             if (entry.hidden) return null;

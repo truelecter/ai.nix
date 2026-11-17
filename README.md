@@ -11,7 +11,7 @@ For 0.16, select **Project groups** in Settings > Sidebar > Sidebar view. The na
 | `homeModules/oh-my-pi.nix`    | `programs.oh-my-pi`: OMP's settings overlay, extensions, rules, skills, agents, hooks, MCP servers                          |
 | `homeModules/paseo.nix`       | `programs.paseo`: the Paseo app and CLI, the daemon's `~/.paseo/config.json`, plugins, `paseo-plugin-dev`                   |
 | `homeModules/searxng.nix`     | `services.searxng`: SearXNG as a user service (launchd on macOS, systemd on Linux)                                          |
-| `omp-extensions/`             | OMP extensions, one per folder (`aws-profile`, `caveman`, `gsd`, `hide-denied-tools`, `mcp-ready`, `paseo-tools`, `say`, ...) |
+| `omp-extensions/`             | OMP extensions, one per folder (`aws-profile`, `caveman`, `gsd`, `hide-denied-tools`, `legacy-ask`, `mcp-ready`, `paseo-tools`, `say`, ...) |
 | `paseo-plugins/`              | Paseo plugins, one per folder (`backlog`, `beautiful-chat`, `project-groups`, `wide-chat`, ...), and their end-to-end suite |
 | `packages/gsd-omp/`           | the gsd-omp CLI, built from the `truelecter/gsd-omp` fork                                                                   |
 | `packages/paseo-pin-workspace/` | `paseo-pin-workspace`: pins a workspace in the local Paseo daemon's sidebar                                               |

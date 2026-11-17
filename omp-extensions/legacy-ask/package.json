@@ -1,0 +1,20 @@
+{
+  "name": "omp-legacy-ask",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Brings back OMP's question-based ask tool (up to v18.18.2), whose multi-select questions Paseo shows with checkboxes",
+  "omp": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test shared/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  }
+}

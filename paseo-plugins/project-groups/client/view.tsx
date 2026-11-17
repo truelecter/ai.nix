@@ -1848,12 +1848,25 @@ function WorkspaceRow({
   );
 }
 
+/** `workspaceOrder` key of the pinned section; project ref keys are JSON arrays, never this. */
+const PINNED_ORDER_KEY = "pinned";
+
 function PinnedSection() {
-  const { styles } = useView();
+  const { styles, prefs } = useView();
+  const order = prefs.workspaceOrder[PINNED_ORDER_KEY];
+  const index = useMemo(() => orderIndex(order ?? NONE), [order]);
+  // Ordered as moved in edit mode; the rest follow in the order they were pinned.
   const pinned = useWorkspaces({
     where: (workspace) => workspace.pinnedAt !== null && !workspace.background,
-    orderBy: ["pinnedAt", "asc"] as const,
+    orderBy: (a, b) =>
+      compareOrdered(
+        index,
+        a.ref.key,
+        b.ref.key,
+        (a.pinnedAt ?? "").localeCompare(b.pinnedAt ?? "") || a.ref.key.localeCompare(b.ref.key),
+      ),
   });
+  const keys = useMemo(() => pinned.map((workspace) => workspace.key), [pinned]);
   if (pinned.length === 0) return null;
   return (
     <View testID="project-groups-pinned">
@@ -1861,7 +1874,12 @@ function PinnedSection() {
         Pinned
       </Text>
       {pinned.map((reference) => (
-        <WorkspaceRow key={reference.key} reference={reference} depth={0} />
+        <WorkspaceRow
+          key={reference.key}
+          reference={reference}
+          depth={0}
+          siblings={{ projectKey: PINNED_ORDER_KEY, keys }}
+        />
       ))}
     </View>
   );

@@ -142,6 +142,34 @@ test("edit mode reorders projects and the order survives a reload", async ({ pag
   await expect.poll(above).toBe(false);
 });
 
+test("edit mode reorders pinned workspaces and the order survives a reload", async ({
+  page,
+  seed,
+  client,
+}) => {
+  const first = await seed("project-groups-pinned-a");
+  const second = await seed("project-groups-pinned-b");
+  await client.setWorkspacePinned(first.workspaceId, true);
+  await client.setWorkspacePinned(second.workspaceId, true);
+  await openGroups(page);
+
+  const pinned = page.getByTestId("project-groups-pinned");
+  const row = (id: string) => pinned.getByTestId(`project-groups-workspace-${refKey(id)}`);
+  const above = async () =>
+    ((await row(first.workspaceId).boundingBox())?.y ?? 0) <
+    ((await row(second.workspaceId).boundingBox())?.y ?? 0);
+  // Pinned in this order, so shown in it until moved.
+  await expect.poll(above).toBe(true);
+
+  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId(`project-groups-workspace-${refKey(second.workspaceId)}-up`).click();
+  await expect.poll(above).toBe(false);
+
+  await page.reload();
+  await expect(row(second.workspaceId)).toBeVisible({ timeout: 30_000 });
+  await expect.poll(above).toBe(false);
+});
+
 test("a pinned workspace archives from its row without edit mode", async ({
   page,
   seed,

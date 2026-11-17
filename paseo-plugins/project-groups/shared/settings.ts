@@ -55,7 +55,7 @@ export const layoutSettings = defineSettings({
     collapsedProjects: z.array(z.string()).default([]),
     /** Project ref keys in display order; projects missing here follow by name. */
     projectOrder: z.array(z.string()).default([]),
-    /** Project ref key -> workspace ref keys in display order. */
+    /** Project ref key (or `pinned`, the pinned section) -> workspace ref keys in display order. */
     workspaceOrder: z.record(z.string(), z.array(z.string())).default({}),
     /** Set once the browser's Paseo 0.15 collapsed groups were imported. */
     importedWebCollapsed: z.boolean().default(false),

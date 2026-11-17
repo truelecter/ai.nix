@@ -137,3 +137,28 @@ export function pointerInside(node: unknown): boolean {
     pointer.x >= rect.left && pointer.x < rect.right && pointer.y >= rect.top && pointer.y < rect.bottom
   );
 }
+
+interface StyledElement {
+  parentElement: StyledElement | null;
+}
+
+type ComputedStyleReader = (element: StyledElement) => { backgroundColor: string };
+
+/**
+ * The first opaque background behind `node` (a react-native-web `View`'s element), for a sticky
+ * header that must cover the rows scrolling under it: Paseo's sidebar color, which the plugin
+ * theme doesn't carry. Null off the web or when nothing above it paints one.
+ */
+export function ancestorBackground(node: unknown): string | null {
+  if (Platform.OS !== "web" || !node || typeof node !== "object" || !("parentElement" in node)) {
+    return null;
+  }
+  const read = Reflect.get(globalThis, "getComputedStyle") as ComputedStyleReader | undefined;
+  if (!read) return null;
+  // A DOM element: react-native-web renders a View as one.
+  for (let element = (node as StyledElement).parentElement; element; element = element.parentElement) {
+    const color = read(element).backgroundColor;
+    if (color && color !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(color)) return color;
+  }
+  return null;
+}

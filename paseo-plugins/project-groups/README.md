@@ -8,7 +8,7 @@ Paseo's default sidebar is a flat list of projects, each with its workspaces. A 
 
 ## Using it
 
-Select the view under **Settings > Sidebar > Sidebar view > Project groups**. Paseo keeps its header, header items, and footer; the view renders pinned workspaces, then the grouped projects, each with its workspaces. It shows projects of every connected host in one list; with more than one host, project rows also show the host's name.
+Select the view under **Settings > Sidebar > Sidebar view > Project groups**. Paseo keeps its header, header items, and footer; the view renders a **Pinned** section, then a **Projects** section with the grouped projects, each with its workspaces. The **Projects** header sticks to the top of the view while the list scrolls under it; its backdrop is the sidebar color read from the page (on phones and tablets, estimated from the theme, since the plugin theme doesn't carry it). It shows projects of every connected host in one list; with more than one host, project rows also show the host's name.
 
 Rows navigate with one tap or click: a workspace opens it, and a project or group row collapses or expands it. Rows look like Paseo's default view: a project shows its icon (its own, or Paseo's lettered square in the same color), turning into the chevron on hover; a workspace shows Paseo's status mark (the turning ring while it runs, an alert when it needs input, a dot when it is ready to review, a faint dot when idle, its kind with a red dot when it failed) and, at its end, its last interaction (`now`, `5m`, `2h`, `3d`, then the date). Row text can't be selected. With a pointer, a row's controls appear only while it is hovered and take the place of the time; touch layouts always show the time and `⋮`:
 
@@ -23,11 +23,12 @@ A right-click (long press on touch) opens the same menu as `⋮`, a dropdown at 
 
 Text and row sizes follow Paseo's sidebar at its default UI font size: 14pt text and 36pt rows on the desktop and web, 15pt text and 44pt rows on touch layouts. The plugin theme carries colors only, so a custom **Interface font size** in Paseo's Appearance settings doesn't reach the view, and the status colors are Paseo's, picked by the theme's lightness.
 
-Grouping and order sit behind the pencil at the top of the view (a check mark leaves edit mode, which itself is not saved). Workspace actions stay in the row menus:
+Each section header has a pencil that turns that section's edit mode on (a check mark turns it off; edit mode itself is not saved). Workspace actions stay in the row menus.
 
-- Project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`) and **Remove from group**.
-- Group: **Rename** (also moves subgroups; type a path with `/` to move it under another group) and **Ungroup** (removes one level: projects move to the parent group, or out of groups at the top level). Both also apply to projects grouped only by their name.
-- Order: every project, group, and workspace row has move up and move down buttons, pinned workspaces included. A group moves with everything in it. A newly pinned workspace, or one pinned again, goes on top of the pinned section.
+- Pinned: move up and move down buttons on every pinned workspace. A newly pinned workspace, or one pinned again, goes on top.
+- Projects, on a project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`) and **Remove from group**.
+- Projects, on a group: **Rename** (also moves subgroups; type a path with `/` to move it under another group) and **Ungroup** (removes one level: projects move to the parent group, or out of groups at the top level). Both also apply to projects grouped only by their name.
+- Projects, order: every project, group, and workspace row has move up and move down buttons. A group moves with everything in it.
 
 A project's group comes from, in order:
 

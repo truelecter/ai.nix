@@ -25,6 +25,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -82,6 +83,7 @@ import {
 import { useHostGroups, type HostGroups } from "./registry.ts";
 import { compactTimeAgo, nextTimeAgoChange } from "./time.ts";
 import {
+  ancestorBackground,
   canOpenInNewWindow,
   fileManagerTarget,
   navigateInApp,
@@ -119,7 +121,6 @@ interface ViewContextValue {
   iconSize: number;
   /** Touch layout: row controls stay visible instead of appearing on hover. */
   compact: boolean;
-  editing: boolean;
   editor: Editor | null;
   setEditor(editor: Editor | null): void;
   prefs: LayoutPrefs;
@@ -148,6 +149,8 @@ const INDENT = 12;
 // web, 15 on phones and tablets). The plugin theme carries colors only, so the sizes live here.
 const BASE_FONT = Platform.OS === "web" ? 14 : 15;
 const SMALL_FONT = Math.round((12 * BASE_FONT) / 14);
+/** Section titles: a step over Paseo's 12pt, which read too small beside the rows. */
+const HEADER_FONT = Math.round((13 * BASE_FONT) / 14);
 const LINE_HEIGHT = Math.round(BASE_FONT * 1.43);
 
 function createStyles(theme: PluginSidebarViewProps["theme"], compact: boolean) {
@@ -159,21 +162,26 @@ function createStyles(theme: PluginSidebarViewProps["theme"], compact: boolean) 
     // Rows are controls: no text selection on a drag or a double click, as in Paseo's sidebar.
     root: { flex: 1, userSelect: "none" },
     content: { paddingHorizontal: 8, paddingBottom: 12 },
-    toolbar: {
+    // A section header row ("Pinned", "Projects"): a row's height, its title a step under the
+    // rows' text, and a 28pt button (a touch target on touch layouts) at the trailing edge.
+    sectionHeader: {
       flexDirection: "row",
       alignItems: "center",
-      minHeight: compact ? 44 : 32,
+      minHeight: rowHeight,
       paddingLeft: 8,
+      paddingRight: 4,
       gap: 8,
     },
-    heading: { flex: 1, color: colors.foregroundMuted, fontSize: SMALL_FONT, fontWeight: "500" },
-    section: {
-      color: colors.foregroundMuted,
-      fontSize: SMALL_FONT,
-      paddingHorizontal: 8,
-      paddingTop: 8,
-      paddingBottom: 4,
+    sectionTitle: { flex: 1, color: colors.foregroundMuted, fontSize: HEADER_FONT },
+    headerButton: {
+      width: compact ? 36 : 28,
+      height: compact ? 36 : 28,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 6,
     },
+    // The gap that separates the pinned section from the projects, as in Paseo's sidebar.
+    pinnedSection: { marginBottom: 8 },
     row: {
       flexDirection: "row",
       alignItems: "center",
@@ -392,11 +400,33 @@ const DARK_STATUS_DOTS: StatusDotColors = {
   attention: "#35c264",
 };
 
-function statusDotColors(theme: PluginSidebarViewProps["theme"]): StatusDotColors {
+/** `surface0` as RGB, or null when it isn't a `#rrggbb` color. */
+function surfaceRgb(theme: PluginSidebarViewProps["theme"]): [number, number, number] | null {
   const hex = /^#?([0-9a-f]{6})/i.exec(theme.colors.surface0)?.[1];
-  if (!hex) return DARK_STATUS_DOTS;
-  const [r, g, b] = [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 128 ? LIGHT_STATUS_DOTS : DARK_STATUS_DOTS;
+  if (!hex) return null;
+  const [r = 0, g = 0, b = 0] = [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+  return [r, g, b];
+}
+
+function isLight(rgb: readonly [number, number, number]): boolean {
+  return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] > 128;
+}
+
+function statusDotColors(theme: PluginSidebarViewProps["theme"]): StatusDotColors {
+  const rgb = surfaceRgb(theme);
+  return rgb && isLight(rgb) ? LIGHT_STATUS_DOTS : DARK_STATUS_DOTS;
+}
+
+/**
+ * Paseo's sidebar background (`surfaceSidebar`), which the plugin theme doesn't carry, for the
+ * sticky header's backdrop where the page can't be read (native). Paseo's light themes use
+ * `surface2`, its dark ones a shade under `surface0`.
+ */
+function estimatedSidebarBackground(theme: PluginSidebarViewProps["theme"]): string {
+  const rgb = surfaceRgb(theme);
+  if (!rgb) return theme.colors.surface0;
+  if (isLight(rgb)) return theme.colors.surface2;
+  return `rgb(${rgb.map((channel) => Math.round(channel * 0.82)).join(", ")})`;
 }
 
 function indicatorColor(
@@ -514,6 +544,72 @@ function IconButton({
         color={disabled ? view.theme.colors.border : view.theme.colors.foregroundMuted}
       />
     </Pressable>
+  );
+}
+
+/** Whether the section a row sits in (pinned, or the projects) is in edit mode. */
+const EditingContext = createContext(false);
+
+/**
+ * A section's header row, as Paseo's "Pinned" and "Workspaces": the title, and a pencil that
+ * turns the section's edit mode on and off (a check mark while it is on). A sticky header paints
+ * the sidebar's background behind it, read from the page on the web and estimated on native.
+ */
+function SectionHeader({
+  title,
+  editing,
+  editLabel,
+  onToggleEditing,
+  sticky = false,
+  testID,
+}: {
+  title: string;
+  editing: boolean;
+  /** What the section's edit mode changes, for the pencil's label: "pinned workspaces". */
+  editLabel: string;
+  onToggleEditing(): void;
+  sticky?: boolean;
+  testID: string;
+}) {
+  const { view, styles } = useView();
+  const header = useRef<View>(null);
+  const [backdrop, setBackdrop] = useState<string | null>(null);
+  const surface = view.theme.colors.surface0;
+  useLayoutEffect(() => {
+    if (sticky) setBackdrop(ancestorBackground(header.current));
+  }, [sticky, surface]);
+  return (
+    <View
+      ref={header}
+      style={[
+        styles.sectionHeader,
+        sticky ? { backgroundColor: backdrop ?? estimatedSidebarBackground(view.theme) } : null,
+      ]}
+      testID={testID}
+    >
+      <Text accessibilityRole="header" numberOfLines={1} style={styles.sectionTitle}>
+        {title}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={editing ? `Done editing ${editLabel}` : `Edit ${editLabel}`}
+        accessibilityState={{ selected: editing }}
+        hitSlop={4}
+        onPress={onToggleEditing}
+        testID={`${testID}-edit`}
+        style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+          styles.headerButton,
+          pressed || hovered || editing ? styles.pressed : null,
+        ]}
+      >
+        {/* Paseo's section header buttons: a 14pt glyph in a 28pt square. */}
+        <Icon
+          name={editing ? "Check" : "Pencil"}
+          size={14}
+          color={view.theme.colors.foregroundMuted}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -1200,6 +1296,7 @@ function ActionStrip({ depth, children }: { depth: number; children: ReactNode }
 
 function GroupRow({ entry }: { entry: GroupEntry }) {
   const ctx = useView();
+  const editing = useContext(EditingContext);
   const { styles, view, iconSize, actions } = ctx;
   const menu = useRowMenu();
   const [hovered, hover] = useRowHover(menu);
@@ -1265,7 +1362,7 @@ function GroupRow({ entry }: { entry: GroupEntry }) {
             </>
           ) : null}
         </Pressable>
-        {ctx.editing ? (
+        {editing ? (
           <MoveButtons
             label={`group ${entry.name}`}
             testID={testID}
@@ -1282,7 +1379,7 @@ function GroupRow({ entry }: { entry: GroupEntry }) {
         onClose={menu.close}
         testID={`${testID}-menu`}
       />
-      {ctx.editing && !renaming ? (
+      {editing && !renaming ? (
         <ActionStrip depth={entry.depth + 1}>
           <TextButton
             label="Rename"
@@ -1333,6 +1430,7 @@ function useFolderTarget(open: boolean, path: string | null | undefined): string
 
 function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: ProjectRef }) {
   const ctx = useView();
+  const editing = useContext(EditingContext);
   const { styles, view, iconSize, actions, prefs } = ctx;
   const menu = useRowMenu();
   const [hovered, hover] = useRowHover(menu);
@@ -1482,7 +1580,7 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
             </>
           ) : null}
         </Pressable>
-        {ctx.editing ? (
+        {editing ? (
           <MoveButtons
             label={entry.label}
             testID={testID}
@@ -1524,7 +1622,7 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
         onClose={closeMenu}
         testID={`${testID}-actions-menu`}
       />
-      {ctx.editing && !assigning ? (
+      {editing && !assigning ? (
         <ActionStrip depth={entry.depth + 1}>
           <TextButton
             label="Move to group"
@@ -1595,6 +1693,7 @@ function WorkspaceRow({
   siblings?: { projectKey: string; keys: readonly string[]; key: string };
 }) {
   const ctx = useView();
+  const editing = useContext(EditingContext);
   const { styles, view, actions } = ctx;
   const paseo = usePaseo();
   const menu = useRowMenu();
@@ -1772,7 +1871,7 @@ function WorkspaceRow({
           </Text>
           {workspace.archiving ? <Text style={styles.detail}>archiving</Text> : null}
         </Pressable>
-        {ctx.editing && siblings ? (
+        {editing && siblings ? (
           <MoveButtons
             label={workspace.title}
             testID={testID}
@@ -1783,7 +1882,7 @@ function WorkspaceRow({
             }
           />
         ) : null}
-        {ctx.editing || workspace.archiving ? null : (
+        {editing || workspace.archiving ? null : (
           <>
             {/* As in Paseo's sidebar: the last interaction, and in its place on hover the archive
                 button and the menu. Touch layouts keep the time and the menu. */}
@@ -1859,7 +1958,8 @@ function pinKey(item: { ref: { key: string }; pinnedAt: string | null }): string
   return `${item.ref.key}@${item.pinnedAt ?? ""}`;
 }
 
-function PinnedSection() {
+/** Pinned workspaces, with their own edit mode for their order. */
+function PinnedSection({ editing, onToggleEditing }: { editing: boolean; onToggleEditing(): void }) {
   const { styles, prefs } = useView();
   const order = prefs.workspaceOrder[PINNED_ORDER_KEY];
   const index = useMemo(() => orderIndex(order ?? NONE), [order]);
@@ -1885,18 +1985,24 @@ function PinnedSection() {
   }, [pinned, stamped]);
   if (pinned.length === 0) return null;
   return (
-    <View testID="project-groups-pinned">
-      <Text accessibilityRole="header" style={styles.section}>
-        Pinned
-      </Text>
-      {pinned.map((reference, position) => (
-        <WorkspaceRow
-          key={reference.key}
-          reference={reference}
-          depth={0}
-          siblings={{ projectKey: PINNED_ORDER_KEY, keys, key: keys[position] ?? reference.key }}
-        />
-      ))}
+    <View style={styles.pinnedSection} testID="project-groups-pinned">
+      <SectionHeader
+        title="Pinned"
+        editing={editing}
+        editLabel="pinned workspaces"
+        onToggleEditing={onToggleEditing}
+        testID="project-groups-pinned-header"
+      />
+      <EditingContext.Provider value={editing}>
+        {pinned.map((reference, position) => (
+          <WorkspaceRow
+            key={reference.key}
+            reference={reference}
+            depth={0}
+            siblings={{ projectKey: PINNED_ORDER_KEY, keys, key: keys[position] ?? reference.key }}
+          />
+        ))}
+      </EditingContext.Provider>
     </View>
   );
 }
@@ -1951,7 +2057,9 @@ export function GroupsView(view: PluginSidebarViewProps) {
   const hostSummaries = useHosts();
   const layoutState = useSettings(layoutSettings);
   const { prefs, save: savePrefs, ready: layoutReady } = useSerializedPrefs(layoutState);
+  // Each section has its own edit mode: the pinned order, and the projects' groups and order.
   const [editing, setEditing] = useState(false);
+  const [editingPinned, setEditingPinned] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [error, setError] = useState<string | null>(null);
   const styles = useMemo(() => createStyles(theme, surface.compact), [theme, surface.compact]);
@@ -2136,7 +2244,6 @@ export function GroupsView(view: PluginSidebarViewProps) {
     // Paseo's `md` icon: 16pt with a pointer, 20pt on touch layouts.
     iconSize: surface.compact ? 20 : 16,
     compact: surface.compact,
-    editing,
     editor,
     setEditor,
     prefs,
@@ -2159,70 +2266,76 @@ export function GroupsView(view: PluginSidebarViewProps) {
 
   return (
     <ViewContext.Provider value={context}>
+      {/* Three children, so the projects header is always child 1 and sticks to the top. */}
       <ScrollView
         style={styles.root}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        stickyHeaderIndices={[1]}
         testID="project-groups-view"
       >
-        <View style={styles.toolbar}>
-          <Text accessibilityRole="header" style={styles.heading}>
-            Projects
-          </Text>
-          <IconButton
-            icon={editing ? "Check" : "Pencil"}
-            label={editing ? "Done editing groups" : "Edit groups"}
-            onPress={() => {
-              close();
-              setEditing((current) => !current);
-            }}
-            testID="project-groups-edit"
+        <View>
+          {ready.length === 0 && problems.length === 0 ? (
+            <Text style={styles.notice} testID="project-groups-loading">
+              Loading groups
+            </Text>
+          ) : null}
+          {problems.map(({ host, message }) => (
+            <View key={host.hostId} style={styles.error}>
+              <Text style={styles.errorText}>
+                Groups on {labels.get(host.hostId) ?? host.hostId}: {message}
+              </Text>
+              <TextButton label="Retry" onPress={() => void host.refresh()} />
+            </View>
+          ))}
+          {layoutState.status === "invalid" || layoutState.status === "error" ? (
+            <View style={styles.error}>
+              <Text style={styles.errorText}>Sidebar layout: {layoutState.error}</Text>
+              {layoutState.status === "invalid" ? (
+                <TextButton label="Reset layout" onPress={() => void layoutState.reset()} />
+              ) : (
+                <TextButton label="Retry" onPress={() => void layoutState.reload()} />
+              )}
+            </View>
+          ) : null}
+          {layoutState.saveError ? (
+            <View style={styles.error}>
+              <Text style={styles.errorText}>Sidebar layout: {layoutState.saveError}</Text>
+            </View>
+          ) : null}
+          {error ? (
+            <View style={styles.error} accessibilityLiveRegion="polite">
+              <Text style={styles.errorText}>{error}</Text>
+              <TextButton label="Dismiss" onPress={() => setError(null)} />
+            </View>
+          ) : null}
+          <PinnedSection
+            editing={editingPinned}
+            onToggleEditing={() => setEditingPinned((current) => !current)}
           />
         </View>
-        {ready.length === 0 && problems.length === 0 ? (
-          <Text style={styles.notice} testID="project-groups-loading">
-            Loading groups
-          </Text>
-        ) : null}
-        {problems.map(({ host, message }) => (
-          <View key={host.hostId} style={styles.error}>
-            <Text style={styles.errorText}>
-              Groups on {labels.get(host.hostId) ?? host.hostId}: {message}
-            </Text>
-            <TextButton label="Retry" onPress={() => void host.refresh()} />
-          </View>
-        ))}
-        {layoutState.status === "invalid" || layoutState.status === "error" ? (
-          <View style={styles.error}>
-            <Text style={styles.errorText}>Sidebar layout: {layoutState.error}</Text>
-            {layoutState.status === "invalid" ? (
-              <TextButton label="Reset layout" onPress={() => void layoutState.reset()} />
-            ) : (
-              <TextButton label="Retry" onPress={() => void layoutState.reload()} />
-            )}
-          </View>
-        ) : null}
-        {layoutState.saveError ? (
-          <View style={styles.error}>
-            <Text style={styles.errorText}>Sidebar layout: {layoutState.saveError}</Text>
-          </View>
-        ) : null}
-        {error ? (
-          <View style={styles.error} accessibilityLiveRegion="polite">
-            <Text style={styles.errorText}>{error}</Text>
-            <TextButton label="Dismiss" onPress={() => setError(null)} />
-          </View>
-        ) : null}
-        <PinnedSection />
-        {layout.map((entry) => {
-          if (entry.hidden) return null;
-          if (entry.kind === "group") return <GroupRow key={entryId(entry)} entry={entry} />;
-          const reference = refs.get(entry.key);
-          return reference ? (
-            <ProjectBlock key={entryId(entry)} entry={entry} reference={reference} />
-          ) : null;
-        })}
-        {projectRows.length === 0 ? <Text style={styles.notice}>No projects yet</Text> : null}
+        <SectionHeader
+          title="Projects"
+          editing={editing}
+          editLabel="groups"
+          onToggleEditing={() => {
+            close();
+            setEditing((current) => !current);
+          }}
+          sticky
+          testID="project-groups-projects-header"
+        />
+        <EditingContext.Provider value={editing}>
+          {layout.map((entry) => {
+            if (entry.hidden) return null;
+            if (entry.kind === "group") return <GroupRow key={entryId(entry)} entry={entry} />;
+            const reference = refs.get(entry.key);
+            return reference ? (
+              <ProjectBlock key={entryId(entry)} entry={entry} reference={reference} />
+            ) : null;
+          })}
+          {projectRows.length === 0 ? <Text style={styles.notice}>No projects yet</Text> : null}
+        </EditingContext.Provider>
       </ScrollView>
     </ViewContext.Provider>
   );

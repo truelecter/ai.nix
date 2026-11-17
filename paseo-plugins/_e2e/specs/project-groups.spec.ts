@@ -46,7 +46,7 @@ test("a project moved to a group in edit mode is nested under the group row", as
   // Normal mode shows no order or group controls.
   await expect(page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-up`)).toHaveCount(0);
 
-  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId("project-groups-projects-header-edit").click();
   await page.getByTestId(`project-groups-project-${refKey(workspace.projectId)}-assign`).click();
   const input = page.getByTestId("project-groups-input");
   await input.fill("E2E group");
@@ -54,7 +54,7 @@ test("a project moved to a group in edit mode is nested under the group row", as
 
   const header = page.getByTestId("project-groups-group-E2E group");
   await expect(header).toHaveAttribute("aria-label", "E2E group, 1 project");
-  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId("project-groups-projects-header-edit").click();
 
   // Assignments are host settings on the daemon, keyed by this host's project ID.
   await expect.poll(() => stored()?.values.projects?.[workspace.projectId]).toBe("E2E group");
@@ -130,10 +130,10 @@ test("edit mode reorders projects and the order survives a reload", async ({ pag
     ((await firstRow.boundingBox())?.y ?? 0) < ((await secondRow.boundingBox())?.y ?? 0);
   await expect.poll(above).toBe(true);
 
-  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId("project-groups-projects-header-edit").click();
   await page.getByTestId(`project-groups-project-${refKey(second.projectId)}-up`).click();
   await expect.poll(above).toBe(false);
-  await page.getByTestId("project-groups-edit").click();
+  await page.getByTestId("project-groups-projects-header-edit").click();
   await expect(page.getByTestId(`project-groups-project-${refKey(second.projectId)}-up`)).toHaveCount(0);
 
   await page.reload();
@@ -171,7 +171,9 @@ test("pinned workspaces reorder in edit mode, and a new pin goes on top", async 
   // Newest pin first until moved.
   await expect.poll(order).toEqual(keys(second, first));
 
-  await page.getByTestId("project-groups-edit").click();
+  // The pinned section's own edit mode: the projects below stay as they are.
+  await page.getByTestId("project-groups-pinned-header-edit").click();
+  await expect(page.getByTestId(`project-groups-project-${refKey(first.projectId)}-up`)).toHaveCount(0);
   await page.getByTestId(`${prefix}${refKey(first.workspaceId)}-up`).click();
   await expect.poll(order).toEqual(keys(first, second));
 

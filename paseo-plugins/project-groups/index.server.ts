@@ -1,4 +1,11 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { createDaemonConnection } from "./server/daemon.ts";
+import {
+  markWorkspaceRead,
+  markWorkspaceUnread,
+  projectIcon,
+  removeProject,
+} from "./shared/daemon.ts";
 import { groupChanges, groupSettings } from "./shared/settings.ts";
 
 export default function contribute(server: PluginServerContext) {
@@ -17,5 +24,29 @@ export default function contribute(server: PluginServerContext) {
       .then((current) => send(current.revision))
       .catch((error: unknown) => console.error("[project-groups] Could not read groups", error));
   });
-  return () => {};
+
+  const daemon = createDaemonConnection();
+  server.handle(removeProject, ({ projectId }) =>
+    daemon.use((client) => client.removeProject(projectId)),
+  );
+  server.handle(projectIcon, ({ projectId }) =>
+    daemon.use(async (client) => {
+      const result = await client.getProjectIcon(projectId);
+      if (result.error) throw new Error(result.error);
+      return { icon: result.icon };
+    }),
+  );
+  server.handle(markWorkspaceRead, ({ workspaceId }) =>
+    daemon.use(async (client) => {
+      await client.clearWorkspaceAttention(workspaceId);
+      return {};
+    }),
+  );
+  server.handle(markWorkspaceUnread, ({ workspaceId }) =>
+    daemon.use(async (client) => {
+      await client.markWorkspaceUnread(workspaceId);
+      return {};
+    }),
+  );
+  return () => daemon.close();
 }

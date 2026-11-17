@@ -12,18 +12,23 @@ export function orderIndex(order: readonly string[]): Map<string, number> {
   return new Map(order.map((key, index) => [key, index]));
 }
 
-/** Keys in `index` first, in that order; then the rest by `fallback`. */
+/**
+ * Keys in `index` in that order, and the rest by `fallback`: after them, or before them with
+ * `missing: "first"` (the pinned section, where a newly pinned workspace goes on top).
+ */
 export function compareOrdered(
   index: ReadonlyMap<string, number>,
   left: string,
   right: string,
   fallback: number,
+  missing: "first" | "last" = "last",
 ): number {
   const a = index.get(left);
   const b = index.get(right);
   if (a !== undefined && b !== undefined) return a - b;
-  if (a !== undefined) return -1;
-  if (b !== undefined) return 1;
+  const side = missing === "last" ? 1 : -1;
+  if (a !== undefined) return -side;
+  if (b !== undefined) return side;
   return fallback;
 }
 
@@ -118,4 +123,16 @@ export function moveItem(keys: readonly string[], key: string, direction: -1 | 1
   const next = [...keys];
   [next[index], next[target]] = [next[target], next[index]];
   return next;
+}
+
+/**
+ * A workspace's time for Paseo's automatic sorts, newest first: when it was created, or its last
+ * prompt (its creation when it has none yet). 0 when unknown, so those sort last.
+ */
+export function workspaceSortTime(
+  item: { createdAt: string | null; lastPromptAt: string | null },
+  sort: "created" | "lastPrompt",
+): number {
+  const time = sort === "lastPrompt" ? (item.lastPromptAt ?? item.createdAt) : item.createdAt;
+  return (time && Date.parse(time)) || 0;
 }

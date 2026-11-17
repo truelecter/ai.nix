@@ -174,6 +174,12 @@ function createStyles(theme: PluginSidebarViewProps["theme"], compact: boolean) 
       paddingRight: 4,
       gap: 8,
     },
+    // A sticky header spans the view's full width, so rows don't show beside it once stuck.
+    stickyHeader: { marginHorizontal: -8, paddingLeft: 16, paddingRight: 12 },
+    stuckHeader: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
     sectionTitle: { flex: 1, color: colors.foregroundMuted, fontSize: HEADER_FONT },
     headerButton: {
       width: compact ? 36 : 28,
@@ -554,17 +560,22 @@ const EditingContext = createContext(false);
 
 /**
  * A section's header row, as Paseo's "Pinned" and "Workspaces": the title and, at the trailing
- * edge, its buttons. A sticky header paints the sidebar's background behind it, read from the
- * page on the web and estimated on native.
+ * edge, its buttons. A sticky header covers the rows scrolling under it with the sidebar's
+ * background: read from the page on the web, where it always paints it; on native, where the
+ * plugin theme lacks that color, an estimate painted only while `stuck`, so the header at rest
+ * shows the real sidebar behind it.
  */
 function SectionHeader({
   title,
   sticky = false,
+  stuck = false,
   testID,
   children,
 }: {
   title: string;
   sticky?: boolean;
+  /** Scrolled under: rows pass beneath it. */
+  stuck?: boolean;
   testID: string;
   children: ReactNode;
 }) {
@@ -575,12 +586,15 @@ function SectionHeader({
   useLayoutEffect(() => {
     if (sticky) setBackdrop(ancestorBackground(header.current));
   }, [sticky, surface]);
+  const fill = backdrop ?? (stuck ? estimatedSidebarBackground(view.theme) : null);
   return (
     <View
       ref={header}
       style={[
         styles.sectionHeader,
-        sticky ? { backgroundColor: backdrop ?? estimatedSidebarBackground(view.theme) } : null,
+        sticky ? styles.stickyHeader : null,
+        sticky && stuck ? styles.stuckHeader : null,
+        sticky && fill ? { backgroundColor: fill } : null,
       ]}
       testID={testID}
     >
@@ -2196,6 +2210,10 @@ export function GroupsView(view: PluginSidebarViewProps) {
   // Each section has its own edit mode: the pinned order, and the projects' groups and order.
   const [editing, setEditing] = useState(false);
   const [editingPinned, setEditingPinned] = useState(false);
+  // Where the projects header sits in the scrolled content, and whether rows pass under it.
+  const [headerTop, setHeaderTop] = useState(0);
+  const [stuck, setStuck] = useState(false);
+  const scrollTop = useRef(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [error, setError] = useState<string | null>(null);
   const styles = useMemo(() => createStyles(theme, surface.compact), [theme, surface.compact]);
@@ -2411,9 +2429,21 @@ export function GroupsView(view: PluginSidebarViewProps) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         stickyHeaderIndices={[1]}
+        onScroll={(event) => {
+          scrollTop.current = event.nativeEvent.contentOffset.y;
+          setStuck(scrollTop.current > headerTop);
+        }}
+        scrollEventThrottle={16}
         testID="project-groups-view"
       >
-        <View>
+        {/* Its height is where the projects header sits in the content. */}
+        <View
+          onLayout={(event) => {
+            const top = event.nativeEvent.layout.height;
+            setHeaderTop(top);
+            setStuck(scrollTop.current > top);
+          }}
+        >
           {ready.length === 0 && problems.length === 0 ? (
             <Text style={styles.notice} testID="project-groups-loading">
               Loading groups
@@ -2453,7 +2483,12 @@ export function GroupsView(view: PluginSidebarViewProps) {
             onToggleEditing={() => setEditingPinned((current) => !current)}
           />
         </View>
-        <SectionHeader title="Projects" sticky testID="project-groups-projects-header">
+        <SectionHeader
+          title="Projects"
+          sticky
+          stuck={stuck}
+          testID="project-groups-projects-header"
+        >
           <ProjectsHeaderActions
             editing={editing}
             onToggleEditing={() => {

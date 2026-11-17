@@ -142,32 +142,49 @@ test("edit mode reorders projects and the order survives a reload", async ({ pag
   await expect.poll(above).toBe(false);
 });
 
-test("edit mode reorders pinned workspaces and the order survives a reload", async ({
+test("pinned workspaces reorder in edit mode, and a new pin goes on top", async ({
   page,
   seed,
   client,
 }) => {
   const first = await seed("project-groups-pinned-a");
   const second = await seed("project-groups-pinned-b");
+  const third = await seed("project-groups-pinned-c");
   await client.setWorkspacePinned(first.workspaceId, true);
   await client.setWorkspacePinned(second.workspaceId, true);
   await openGroups(page);
 
   const pinned = page.getByTestId("project-groups-pinned");
-  const row = (id: string) => pinned.getByTestId(`project-groups-workspace-${refKey(id)}`);
-  const above = async () =>
-    ((await row(first.workspaceId).boundingBox())?.y ?? 0) <
-    ((await row(second.workspaceId).boundingBox())?.y ?? 0);
-  // Pinned in this order, so shown in it until moved.
-  await expect.poll(above).toBe(true);
+  const prefix = "project-groups-workspace-";
+  // Row test IDs end in the ref key, a JSON array; the row's buttons and time add suffixes.
+  const order = async () =>
+    (
+      await pinned
+        .locator(`[data-testid^='${prefix}']`)
+        .evaluateAll(
+          (rows, start) => rows.map((row) => row.getAttribute("data-testid")?.slice(start.length) ?? ""),
+          prefix,
+        )
+    ).filter((key) => key.endsWith("]"));
+  const keys = (...workspaces: { workspaceId: string }[]) =>
+    workspaces.map((workspace) => refKey(workspace.workspaceId));
+  // Newest pin first until moved.
+  await expect.poll(order).toEqual(keys(second, first));
 
   await page.getByTestId("project-groups-edit").click();
-  await page.getByTestId(`project-groups-workspace-${refKey(second.workspaceId)}-up`).click();
-  await expect.poll(above).toBe(false);
+  await page.getByTestId(`${prefix}${refKey(first.workspaceId)}-up`).click();
+  await expect.poll(order).toEqual(keys(first, second));
 
   await page.reload();
-  await expect(row(second.workspaceId)).toBeVisible({ timeout: 30_000 });
-  await expect.poll(above).toBe(false);
+  await expect(pinned).toBeVisible({ timeout: 30_000 });
+  await expect.poll(order).toEqual(keys(first, second));
+
+  // A new pin, and one pinned again, go on top of the arranged ones.
+  await client.setWorkspacePinned(third.workspaceId, true);
+  await expect.poll(order).toEqual(keys(third, first, second));
+  await client.setWorkspacePinned(second.workspaceId, false);
+  await client.setWorkspacePinned(second.workspaceId, true);
+  await expect.poll(order).toEqual(keys(second, third, first));
 });
 
 test("a pinned workspace archives from its row without edit mode", async ({

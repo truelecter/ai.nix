@@ -27,7 +27,7 @@ Grouping and order sit behind the pencil at the top of the view (a check mark le
 
 - Project: **Move to group** (type a group, or pick an existing one, and press Enter; use `/` to nest: `work/aws`) and **Remove from group**.
 - Group: **Rename** (also moves subgroups; type a path with `/` to move it under another group) and **Ungroup** (removes one level: projects move to the parent group, or out of groups at the top level). Both also apply to projects grouped only by their name.
-- Order: every project, group, and workspace row has move up and move down buttons, pinned workspaces included (until moved, they keep the order they were pinned in). A group moves with everything in it.
+- Order: every project, group, and workspace row has move up and move down buttons, pinned workspaces included. A group moves with everything in it. A newly pinned workspace, or one pinned again, goes on top of the pinned section.
 
 A project's group comes from, in order:
 

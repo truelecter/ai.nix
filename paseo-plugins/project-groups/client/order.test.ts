@@ -39,6 +39,14 @@ describe("compareOrdered", () => {
     );
     assert.deepEqual(sorted, ["c", "a", "b", "d"]);
   });
+
+  it("puts the rest first with missing: first", () => {
+    const index = orderIndex(["c", "a"]);
+    const sorted = ["a", "b", "c", "d"].sort((x, y) =>
+      compareOrdered(index, x, y, x.localeCompare(y), "first"),
+    );
+    assert.deepEqual(sorted, ["b", "d", "c", "a"]);
+  });
 });
 
 describe("moveSibling", () => {

@@ -1560,7 +1560,7 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
               key={workspace.key}
               reference={workspace}
               depth={entry.depth + 1}
-              siblings={{ projectKey: key, keys: workspaceKeys }}
+              siblings={{ projectKey: key, keys: workspaceKeys, key: workspace.key }}
             />
           ))}
       {!collapsed && count === 0 ? (
@@ -1591,8 +1591,8 @@ function WorkspaceRow({
 }: {
   reference: WorkspaceRef;
   depth: number;
-  /** Absent in the pinned section, which follows pin order. */
-  siblings?: { projectKey: string; keys: readonly string[] };
+  /** The rows it moves among: `workspaceOrder[projectKey]` holds `keys`, this row's is `key`. */
+  siblings?: { projectKey: string; keys: readonly string[]; key: string };
 }) {
   const ctx = useView();
   const { styles, view, actions } = ctx;
@@ -1621,7 +1621,7 @@ function WorkspaceRow({
   const id = `workspace:${reference.key}`;
   const active = view.active.workspace?.key === reference.key;
   const renaming = ctx.editor?.id === id;
-  const position = siblings ? siblings.keys.indexOf(reference.key) : -1;
+  const position = siblings ? siblings.keys.indexOf(siblings.key) : -1;
   const testID = `project-groups-workspace-${reference.key}`;
   const handle = () => paseo.workspaces.ref(reference);
   const status = workspace.indicatorLabel ? `, ${workspace.indicatorLabel}` : "";
@@ -1779,7 +1779,7 @@ function WorkspaceRow({
             up={position > 0}
             down={position >= 0 && position < siblings.keys.length - 1}
             onMove={(direction) =>
-              actions.moveWorkspace(siblings.projectKey, siblings.keys, reference.key, direction)
+              actions.moveWorkspace(siblings.projectKey, siblings.keys, siblings.key, direction)
             }
           />
         ) : null}
@@ -1851,34 +1851,50 @@ function WorkspaceRow({
 /** `workspaceOrder` key of the pinned section; project ref keys are JSON arrays, never this. */
 const PINNED_ORDER_KEY = "pinned";
 
+/**
+ * A pinned workspace's key in the pinned order: its ref key with the time it was pinned, so a
+ * workspace unpinned and pinned again counts as new and goes back on top.
+ */
+function pinKey(item: { ref: { key: string }; pinnedAt: string | null }): string {
+  return `${item.ref.key}@${item.pinnedAt ?? ""}`;
+}
+
 function PinnedSection() {
   const { styles, prefs } = useView();
   const order = prefs.workspaceOrder[PINNED_ORDER_KEY];
   const index = useMemo(() => orderIndex(order ?? NONE), [order]);
-  // Ordered as moved in edit mode; the rest follow in the order they were pinned.
+  const where = (workspace: { pinnedAt: string | null; background: boolean }) =>
+    workspace.pinnedAt !== null && !workspace.background;
+  // Ordered as moved in edit mode, with workspaces pinned since on top, newest first.
   const pinned = useWorkspaces({
-    where: (workspace) => workspace.pinnedAt !== null && !workspace.background,
+    where,
     orderBy: (a, b) =>
       compareOrdered(
         index,
-        a.ref.key,
-        b.ref.key,
-        (a.pinnedAt ?? "").localeCompare(b.pinnedAt ?? "") || a.ref.key.localeCompare(b.ref.key),
+        pinKey(a),
+        pinKey(b),
+        (b.pinnedAt ?? "").localeCompare(a.pinnedAt ?? "") || a.ref.key.localeCompare(b.ref.key),
+        "first",
       ),
   });
-  const keys = useMemo(() => pinned.map((workspace) => workspace.key), [pinned]);
+  // The SDK hands back refs only; grouping by pin key reads each one's.
+  const stamped = useWorkspaces({ where, groupBy: pinKey });
+  const keys = useMemo(() => {
+    const byRef = new Map(stamped.flatMap((group) => group.items.map((ref) => [ref.key, group.key])));
+    return pinned.map((reference) => byRef.get(reference.key) ?? reference.key);
+  }, [pinned, stamped]);
   if (pinned.length === 0) return null;
   return (
     <View testID="project-groups-pinned">
       <Text accessibilityRole="header" style={styles.section}>
         Pinned
       </Text>
-      {pinned.map((reference) => (
+      {pinned.map((reference, position) => (
         <WorkspaceRow
           key={reference.key}
           reference={reference}
           depth={0}
-          siblings={{ projectKey: PINNED_ORDER_KEY, keys }}
+          siblings={{ projectKey: PINNED_ORDER_KEY, keys, key: keys[position] ?? reference.key }}
         />
       ))}
     </View>

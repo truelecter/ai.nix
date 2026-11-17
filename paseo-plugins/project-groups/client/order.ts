@@ -12,18 +12,23 @@ export function orderIndex(order: readonly string[]): Map<string, number> {
   return new Map(order.map((key, index) => [key, index]));
 }
 
-/** Keys in `index` first, in that order; then the rest by `fallback`. */
+/**
+ * Keys in `index` in that order, and the rest by `fallback`: after them, or before them with
+ * `missing: "first"` (the pinned section, where a newly pinned workspace goes on top).
+ */
 export function compareOrdered(
   index: ReadonlyMap<string, number>,
   left: string,
   right: string,
   fallback: number,
+  missing: "first" | "last" = "last",
 ): number {
   const a = index.get(left);
   const b = index.get(right);
   if (a !== undefined && b !== undefined) return a - b;
-  if (a !== undefined) return -1;
-  if (b !== undefined) return 1;
+  const side = missing === "last" ? 1 : -1;
+  if (a !== undefined) return -side;
+  if (b !== undefined) return side;
   return fallback;
 }
 

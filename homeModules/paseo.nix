@@ -151,7 +151,7 @@ in {
       default = {};
       example = literalExpression ''
         {
-          header-tab-name = { };
+          catppuccin-mocha = { };
           vpn.enabled = false;
         }
       '';

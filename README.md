@@ -2,7 +2,7 @@
 
 Nix packages and Home Manager modules for agent tooling: [oh-my-pi](https://github.com/can1357/oh-my-pi) (`omp`) with its extensions and GSD, [Paseo](https://github.com/getpaseo/paseo) with its plugins, and a local SearXNG for OMP's web search.
 
-For 0.16, select **Project groups** in Settings > Sidebar > Sidebar view. The native sidebar view replaces DOM rearrangement, preserves nested assignments through migration, and keeps move controls in a separate Edit mode. `header-tab-name` handles compact workspace panes, and `system-health` includes hidden background helpers in its agent accounting. Existing width and chat-rendering plugins remain enabled; their behavior is not replaced by this migration.
+For 0.16, select **Project groups** in Settings > Sidebar > Sidebar view. The native sidebar view replaces DOM rearrangement, preserves nested assignments through migration, and keeps move controls in a separate Edit mode. `system-health` includes hidden background helpers in its agent accounting. Existing width and chat-rendering plugins remain enabled; their behavior is not replaced by this migration.
 
 ## What's in it
 
@@ -12,7 +12,7 @@ For 0.16, select **Project groups** in Settings > Sidebar > Sidebar view. The na
 | `homeModules/paseo.nix`       | `programs.paseo`: the Paseo app and CLI, the daemon's `~/.paseo/config.json`, plugins, `paseo-plugin-dev`                   |
 | `homeModules/searxng.nix`     | `services.searxng`: SearXNG as a user service (launchd on macOS, systemd on Linux)                                          |
 | `omp-extensions/`             | OMP extensions, one per folder (`aws-profile`, `caveman`, `gsd`, `hide-denied-tools`, `legacy-ask`, `mcp-ready`, `paseo-tools`, `say`, ...) |
-| `paseo-plugins/`              | Paseo plugins, one per folder (`backlog`, `beautiful-chat`, `project-groups`, `header-tab-name`, ...), and their end-to-end suite |
+| `paseo-plugins/`              | Paseo plugins, one per folder (`backlog`, `beautiful-chat`, `project-groups`, `system-health`, ...), and their end-to-end suite |
 | `packages/gsd-omp/`           | the gsd-omp CLI, built from the `truelecter/gsd-omp` fork                                                                   |
 | `packages/paseo-pin-workspace/` | `paseo-pin-workspace`: pins a workspace in the local Paseo daemon's sidebar                                               |
 
@@ -47,7 +47,7 @@ Then, in a Home Manager configuration:
     desktop.enable = true;
     plugins = {
       backlog = {};
-      header-tab-name = {};
+      catppuccin-mocha = {};
     };
   };
 }

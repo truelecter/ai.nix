@@ -8,9 +8,9 @@ Paseo maps OMP's `ask` to its question card by reading the tool call's `question
 
 ## What it does
 
-- Registers `ask` (same name, so it replaces the built-in) with the old parameters: `questions[]` of `{id, question, header?, options[{label, description?, preview?}], multi?, recommended?}`, and the old tool description.
-- Where OMP offers the rich ask dialog (`ctx.ui.askDialog`: the interactive TUI, RPC hosts that sent `set_ask_dialog`), it shows that dialog, including "Chat about this" and option notes.
-- Elsewhere (Paseo and other RPC hosts) it walks the questions one prompt at a time, as OMP did:
+- Registers `ask` (same name, so it replaces the built-in) with the old parameters: `questions[]` of `{id, question, header, options[{label, description?, preview?}], multi?, recommended?}`, and the old tool description. `header` is required here (optional in OMP's old `ask`): it is the question's tab label in the rich dialog and in Paseo's question card.
+- Where OMP offers the rich ask dialog (`ctx.ui.askDialog`: the interactive TUI, RPC hosts that sent `set_ask_dialog`, such as Paseo builds that show it as one question card), it shows that dialog, including "Chat about this" and option notes.
+- Elsewhere (other RPC hosts) it walks the questions one prompt at a time, as OMP did:
   - single choice: one `select` with the options, the recommended one marked " (Recommended)", and "Other (type your own)";
   - `multi: true`: a `select` per toggle, titled `(N selected) <question>`, with "Done selecting" once something is checked and the checkbox state in `selectionMarker`/`checkedIndices`;
   - "Other" opens an `editor` titled with the question;

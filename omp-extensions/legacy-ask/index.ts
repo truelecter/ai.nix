@@ -25,7 +25,8 @@ export default function legacyAsk(pi: ExtensionAPI): void {
   const question = z.object({
     id: z.string(),
     question: z.string(),
-    header: z.string().describe("display chip").optional(),
+    // Required, unlike the built-in's optional chip: Paseo titles each question's tab with it.
+    header: z.string().describe("tab label, 1-3 words"),
     options: z.array(option),
     multi: z.boolean().optional(),
     recommended: z.number().describe("0-based default index").optional(),

@@ -121,8 +121,10 @@ interface ViewContextValue {
   view: PluginSidebarViewProps;
   styles: Styles;
   iconSize: number;
-  /** Touch layout: row controls stay visible instead of appearing on hover. */
+  /** Phone layout: touch-sized rows and controls, bottom-sheet menus. */
   compact: boolean;
+  /** No hover (phone layouts, the native app on tablets): row controls stay visible. */
+  touch: boolean;
   editor: Editor | null;
   setEditor(editor: Editor | null): void;
   prefs: LayoutPrefs;
@@ -163,6 +165,7 @@ function createStyles(theme: PluginSidebarViewProps["theme"], compact: boolean) 
   return StyleSheet.create({
     // Rows are controls: no text selection on a drag or a double click, as in Paseo's sidebar.
     root: { flex: 1, userSelect: "none" },
+    scroller: { flex: 1 },
     content: { paddingHorizontal: 8, paddingBottom: 12 },
     // A section header row ("Pinned", "Projects"): a row's height, its title a step under the
     // rows' text, and a 28pt button (a touch target on touch layouts) at the trailing edge.
@@ -176,6 +179,8 @@ function createStyles(theme: PluginSidebarViewProps["theme"], compact: boolean) 
     },
     // A sticky header spans the view's full width, so rows don't show beside it once stuck.
     stickyHeader: { marginHorizontal: -8, paddingLeft: 16, paddingRight: 12 },
+    // The stuck header's copy over the top of the view on native, outside the content's padding.
+    floatingHeader: { position: "absolute", top: 0, left: 0, right: 0, marginHorizontal: 0 },
     stuckHeader: {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
@@ -569,6 +574,8 @@ function SectionHeader({
   title,
   sticky = false,
   stuck = false,
+  floating = false,
+  hidden = false,
   testID,
   children,
 }: {
@@ -576,6 +583,10 @@ function SectionHeader({
   sticky?: boolean;
   /** Scrolled under: rows pass beneath it. */
   stuck?: boolean;
+  /** The stuck header's copy laid over the top of the view (native). */
+  floating?: boolean;
+  /** Covered by its floating copy: hidden from screen readers. */
+  hidden?: boolean;
   testID: string;
   children: ReactNode;
 }) {
@@ -590,9 +601,12 @@ function SectionHeader({
   return (
     <View
       ref={header}
+      importantForAccessibility={hidden ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={hidden}
       style={[
         styles.sectionHeader,
         sticky ? styles.stickyHeader : null,
+        floating ? styles.floatingHeader : null,
         sticky && stuck ? styles.stuckHeader : null,
         sticky && fill ? { backgroundColor: fill } : null,
       ]}
@@ -1697,7 +1711,7 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
         >
           {/* As in Paseo's sidebar: the project's icon, the chevron while the row is hovered. */}
           <View style={styles.markSlot}>
-            {(hovered || menu.placement) && !ctx.compact ? (
+            {(hovered || menu.placement) && !ctx.touch ? (
               <Icon
                 name={collapsed ? "ChevronRight" : "ChevronDown"}
                 size={iconSize}
@@ -1731,7 +1745,7 @@ function ProjectBlock({ entry, reference }: { entry: ProjectEntry; reference: Pr
             down={moves?.down ?? false}
             onMove={(direction) => actions.moveRow(id, direction)}
           />
-        ) : ctx.compact || hovered || menu.placement ? (
+        ) : ctx.touch || hovered || menu.placement ? (
           // As in Paseo's sidebar, the buttons take room only while they show.
           <>
             <IconButton
@@ -1878,7 +1892,7 @@ function WorkspaceRow({
   };
   // A worktree's folder goes with it, and a touch is easy to misplace: both ask first. A local
   // checkout with a pointer archives at once, as in Paseo's own sidebar.
-  const asksBeforeArchive = worktree || ctx.compact;
+  const asksBeforeArchive = worktree || ctx.touch;
   const closeMenu = () => {
     menu.close();
     setPanel(null);
@@ -2034,7 +2048,7 @@ function WorkspaceRow({
           <>
             {/* As in Paseo's sidebar: the last interaction, and in its place on hover the archive
                 button and the menu. Touch layouts keep the time and the menu. */}
-            {!ctx.compact && (hovered || confirmArchive || menu.placement) ? (
+            {!ctx.touch && (hovered || confirmArchive || menu.placement) ? (
               <IconButton
                 icon="Archive"
                 label={`Archive ${workspace.title}`}
@@ -2047,7 +2061,7 @@ function WorkspaceRow({
             ) : workspace.statusEnteredAt ? (
               <WorkspaceTime at={workspace.statusEnteredAt} />
             ) : null}
-            {ctx.compact || hovered || menu.placement ? (
+            {ctx.touch || hovered || menu.placement ? (
               <MenuTrigger
                 label={`Actions for ${workspace.title}`}
                 menu={menu}
@@ -2401,6 +2415,7 @@ export function GroupsView(view: PluginSidebarViewProps) {
     // Paseo's `md` icon: 16pt with a pointer, 20pt on touch layouts.
     iconSize: surface.compact ? 20 : 16,
     compact: surface.compact,
+    touch: surface.compact || surface.platform !== "web",
     editor,
     setEditor,
     prefs,
@@ -2421,94 +2436,118 @@ export function GroupsView(view: PluginSidebarViewProps) {
       : [],
   );
 
+  // On native, React Native moves a sticky header with a native-driven transform that touch
+  // handling and `measureInWindow` don't follow: once rows pass under it, its buttons take
+  // presses only where the header was before it stuck, and its menu opens off screen. There the
+  // stuck header is a copy laid over the top of the view, outside the scrolled content; the web
+  // keeps the browser's sticky header.
+  const floatingHeader = Platform.OS !== "web";
+  const headerActions = (
+    <ProjectsHeaderActions
+      editing={editing}
+      onToggleEditing={() => {
+        close();
+        setEditing((current) => !current);
+      }}
+    />
+  );
+
   return (
     <ViewContext.Provider value={context}>
-      {/* Three children, so the projects header is always child 1 and sticks to the top. */}
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        stickyHeaderIndices={[1]}
-        onScroll={(event) => {
-          scrollTop.current = event.nativeEvent.contentOffset.y;
-          setStuck(scrollTop.current > headerTop);
-        }}
-        scrollEventThrottle={16}
-        testID="project-groups-view"
-      >
-        {/* Its height is where the projects header sits in the content. */}
-        <View
-          onLayout={(event) => {
-            const top = event.nativeEvent.layout.height;
-            setHeaderTop(top);
-            setStuck(scrollTop.current > top);
+      <View style={styles.root}>
+        {/* Three children, so the projects header is always child 1 and sticks to the top. */}
+        <ScrollView
+          style={styles.scroller}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          stickyHeaderIndices={floatingHeader ? undefined : [1]}
+          onScroll={(event) => {
+            scrollTop.current = event.nativeEvent.contentOffset.y;
+            setStuck(scrollTop.current > headerTop);
           }}
+          scrollEventThrottle={16}
+          testID="project-groups-view"
         >
-          {ready.length === 0 && problems.length === 0 ? (
-            <Text style={styles.notice} testID="project-groups-loading">
-              Loading groups
-            </Text>
-          ) : null}
-          {problems.map(({ host, message }) => (
-            <View key={host.hostId} style={styles.error}>
-              <Text style={styles.errorText}>
-                Groups on {labels.get(host.hostId) ?? host.hostId}: {message}
-              </Text>
-              <TextButton label="Retry" onPress={() => void host.refresh()} />
-            </View>
-          ))}
-          {layoutState.status === "invalid" || layoutState.status === "error" ? (
-            <View style={styles.error}>
-              <Text style={styles.errorText}>Sidebar layout: {layoutState.error}</Text>
-              {layoutState.status === "invalid" ? (
-                <TextButton label="Reset layout" onPress={() => void layoutState.reset()} />
-              ) : (
-                <TextButton label="Retry" onPress={() => void layoutState.reload()} />
-              )}
-            </View>
-          ) : null}
-          {layoutState.saveError ? (
-            <View style={styles.error}>
-              <Text style={styles.errorText}>Sidebar layout: {layoutState.saveError}</Text>
-            </View>
-          ) : null}
-          {error ? (
-            <View style={styles.error} accessibilityLiveRegion="polite">
-              <Text style={styles.errorText}>{error}</Text>
-              <TextButton label="Dismiss" onPress={() => setError(null)} />
-            </View>
-          ) : null}
-          <PinnedSection
-            editing={editingPinned}
-            onToggleEditing={() => setEditingPinned((current) => !current)}
-          />
-        </View>
-        <SectionHeader
-          title="Projects"
-          sticky
-          stuck={stuck}
-          testID="project-groups-projects-header"
-        >
-          <ProjectsHeaderActions
-            editing={editing}
-            onToggleEditing={() => {
-              close();
-              setEditing((current) => !current);
+          {/* Its height is where the projects header sits in the content. */}
+          <View
+            onLayout={(event) => {
+              const top = event.nativeEvent.layout.height;
+              setHeaderTop(top);
+              setStuck(scrollTop.current > top);
             }}
-          />
-        </SectionHeader>
-        <EditingContext.Provider value={editing}>
-          {layout.map((entry) => {
-            if (entry.hidden) return null;
-            if (entry.kind === "group") return <GroupRow key={entryId(entry)} entry={entry} />;
-            const reference = refs.get(entry.key);
-            return reference ? (
-              <ProjectBlock key={entryId(entry)} entry={entry} reference={reference} />
-            ) : null;
-          })}
-          {projectRows.length === 0 ? <Text style={styles.notice}>No projects yet</Text> : null}
-        </EditingContext.Provider>
-      </ScrollView>
+          >
+            {ready.length === 0 && problems.length === 0 ? (
+              <Text style={styles.notice} testID="project-groups-loading">
+                Loading groups
+              </Text>
+            ) : null}
+            {problems.map(({ host, message }) => (
+              <View key={host.hostId} style={styles.error}>
+                <Text style={styles.errorText}>
+                  Groups on {labels.get(host.hostId) ?? host.hostId}: {message}
+                </Text>
+                <TextButton label="Retry" onPress={() => void host.refresh()} />
+              </View>
+            ))}
+            {layoutState.status === "invalid" || layoutState.status === "error" ? (
+              <View style={styles.error}>
+                <Text style={styles.errorText}>Sidebar layout: {layoutState.error}</Text>
+                {layoutState.status === "invalid" ? (
+                  <TextButton label="Reset layout" onPress={() => void layoutState.reset()} />
+                ) : (
+                  <TextButton label="Retry" onPress={() => void layoutState.reload()} />
+                )}
+              </View>
+            ) : null}
+            {layoutState.saveError ? (
+              <View style={styles.error}>
+                <Text style={styles.errorText}>Sidebar layout: {layoutState.saveError}</Text>
+              </View>
+            ) : null}
+            {error ? (
+              <View style={styles.error} accessibilityLiveRegion="polite">
+                <Text style={styles.errorText}>{error}</Text>
+                <TextButton label="Dismiss" onPress={() => setError(null)} />
+              </View>
+            ) : null}
+            <PinnedSection
+              editing={editingPinned}
+              onToggleEditing={() => setEditingPinned((current) => !current)}
+            />
+          </View>
+          <SectionHeader
+            title="Projects"
+            sticky
+            stuck={stuck}
+            hidden={floatingHeader && stuck}
+            testID="project-groups-projects-header"
+          >
+            {headerActions}
+          </SectionHeader>
+          <EditingContext.Provider value={editing}>
+            {layout.map((entry) => {
+              if (entry.hidden) return null;
+              if (entry.kind === "group") return <GroupRow key={entryId(entry)} entry={entry} />;
+              const reference = refs.get(entry.key);
+              return reference ? (
+                <ProjectBlock key={entryId(entry)} entry={entry} reference={reference} />
+              ) : null;
+            })}
+            {projectRows.length === 0 ? <Text style={styles.notice}>No projects yet</Text> : null}
+          </EditingContext.Provider>
+        </ScrollView>
+        {floatingHeader && stuck ? (
+          <SectionHeader
+            title="Projects"
+            sticky
+            stuck
+            floating
+            testID="project-groups-projects-header-stuck"
+          >
+            {headerActions}
+          </SectionHeader>
+        ) : null}
+      </View>
     </ViewContext.Provider>
   );
 }

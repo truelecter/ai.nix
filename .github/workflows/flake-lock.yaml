@@ -1,15 +1,33 @@
 # Weekly `nix flake update` as a pull request with auto-merge. PR_WF_ENABLED_TOKEN is a token whose
 # pushes start workflows (GITHUB_TOKEN's don't), so the end-to-end suite runs on the pull request.
+# A dispatch with `input` updates only that input, on its own branch: the Paseo fork dispatches
+# `input=paseo` on every push of its `local` branch.
 name: Update flake.lock
 on:
   workflow_dispatch:
+    inputs:
+      input:
+        description: "Update only this flake input (empty: all inputs)"
+        required: false
+        default: ""
   schedule:
     - cron: "0 0 * * 6" # At 00:00 on Saturday
+
+concurrency:
+  group: flake-lock-${{ inputs.input || 'all' }}
+  cancel-in-progress: true
 
 jobs:
   lockfile:
     runs-on: ubuntu-latest
+    env:
+      INPUT: ${{ inputs.input }}
+      SUBJECT: "${{ inputs.input && format('deps(repo): update {0} in flake.lock', inputs.input) || 'deps(repo): update flake.lock' }}"
     steps:
+      - name: Check the input name
+        run: |
+          [[ "$INPUT" =~ ^[A-Za-z0-9_-]*$ ]] || { echo "invalid input name: $INPUT" >&2; exit 1; }
+
       - name: Checkout repository
         uses: actions/checkout@v7
 
@@ -25,9 +43,10 @@ jobs:
         id: ufl
         with:
           token: ${{ secrets.PR_WF_ENABLED_TOKEN }}
-          pr-title: "[Automated] Update 'flake.lock'"
-          branch: "auto/update-flake-lock"
-          commit-msg: "deps(repo): update flake.lock"
+          inputs: ${{ inputs.input }}
+          pr-title: ${{ inputs.input && format('[Automated] Update {0} in flake.lock', inputs.input) || '[Automated] Update ''flake.lock''' }}
+          branch: ${{ inputs.input && format('auto/update-{0}', inputs.input) || 'auto/update-flake-lock' }}
+          commit-msg: ${{ env.SUBJECT }}
           pr-labels: |
             dependencies
             automated
@@ -35,7 +54,7 @@ jobs:
       - name: Enable auto-merge
         if: ${{ steps.ufl.outputs.pull-request-number != '' }}
         run: |
-          gh pr merge --squash --auto "$PR_NUMBER" --subject "deps(repo): update flake.lock"
+          gh pr merge --squash --auto "$PR_NUMBER" --subject "$SUBJECT"
         env:
           GH_TOKEN: ${{ secrets.PR_WF_ENABLED_TOKEN }}
           PR_NUMBER: ${{ steps.ufl.outputs.pull-request-number }}
